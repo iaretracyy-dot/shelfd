@@ -238,6 +238,30 @@ function readEdits(form, book) {
   return out;
 }
 
+// Book info on the left, About on the right (stacks on small screens).
+function infoColumns(book, editing, editButton) {
+  const about = book.description
+    ? `<div class="about-col">
+        <h2 class="section-title">About</h2>
+        <p class="description clamp" id="about-text">${esc(book.description)}</p>
+        <button type="button" class="btn small ghost" id="about-toggle" hidden>Show more</button>
+      </div>`
+    : '';
+  return `<div class="info-cols ${about ? '' : 'single'}"><div>${detailsList(book, editing)}${editButton}</div>${about}</div>`;
+}
+
+// Offer "Show more" only when the description is actually cut off.
+function wireAboutToggle() {
+  const text = $('#about-text');
+  const toggle = $('#about-toggle');
+  if (!text || !toggle) return;
+  toggle.hidden = text.scrollHeight <= text.clientHeight + 1;
+  toggle.addEventListener('click', () => {
+    const open = text.classList.toggle('clamp');
+    toggle.textContent = open ? 'Show more' : 'Show less';
+  });
+}
+
 function renderPreview(state, signal) {
   const { book, editions, editing } = state;
   const owned = store.findInLibrary(book);
@@ -265,12 +289,11 @@ function renderPreview(state, signal) {
         ${book.subtitle ? `<p class="book-sub">${esc(book.subtitle)}</p>` : ''}
         <div class="byline">by ${(book.authors || []).map((a) => `<a href="#/search?q=${encodeURIComponent(a)}">${esc(a)}</a>`).join(', ') || 'Unknown author'}</div>
         ${editionOptions}
-        ${detailsList(book, editing)}
-        <button type="button" class="btn small ghost" data-act="edit">${editing ? 'Done editing' : '✎ Correct details'}</button>
-        ${book.description ? `<h2 class="section-title">About</h2><p class="description clamp">${esc(book.description)}</p>` : ''}
+        ${infoColumns(book, editing, `<button type="button" class="btn small ghost" data-act="edit">${editing ? 'Done editing' : '✎ Correct details'}</button>`)}
       </div>
     </form>`;
 
+  wireAboutToggle();
   const form = $('#preview-form');
   const current = () => (state.editing ? readEdits(form, state.book) : state.book);
 
@@ -392,14 +415,13 @@ function bookPage([id]) {
           <h1 class="book-title">${esc(book.title)}</h1>
           ${book.subtitle ? `<p class="book-sub">${esc(book.subtitle)}</p>` : ''}
           <div class="byline">by ${(book.authors || []).map((a) => `<a href="#/search?q=${encodeURIComponent(a)}">${esc(a)}</a>`).join(', ') || 'Unknown author'}</div>
-          ${detailsList(book, editing)}
-          <button type="button" class="btn small ghost" data-act="edit">${editing ? 'Save details' : '✎ Edit details'}</button>
+          ${infoColumns(book, editing, `<button type="button" class="btn small ghost" data-act="edit">${editing ? 'Save details' : '✎ Edit details'}</button>`)}
           <h2 class="section-title">Your reads</h2>
           ${logs.length ? `<ul class="log-list">${logs.map(logItem).join('')}</ul>` : '<p class="muted">Not logged yet.</p>'}
-          ${book.description ? `<h2 class="section-title">About</h2><p class="description clamp">${esc(book.description)}</p>` : ''}
         </div>
       </form>`;
 
+    wireAboutToggle();
     const form = $('#book-form');
     form.querySelector('[data-act="log"]').addEventListener('click', () => openLogDialog(book, null));
     form.querySelector('[data-act="edit"]').addEventListener('click', () => {
