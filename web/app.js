@@ -238,7 +238,7 @@ function readEdits(form, book) {
   return out;
 }
 
-// Book info on the left, About on the right (stacks on small screens).
+// About on the left, book info on the right (stacks on small screens, About first).
 function infoColumns(book, editing, editButton) {
   const about = book.description
     ? `<div class="about-col">
@@ -247,7 +247,7 @@ function infoColumns(book, editing, editButton) {
         <button type="button" class="btn small ghost" id="about-toggle" hidden>Show more</button>
       </div>`
     : '';
-  return `<div class="info-cols ${about ? '' : 'single'}"><div>${detailsList(book, editing)}${editButton}</div>${about}</div>`;
+  return `<div class="info-cols ${about ? '' : 'single'}">${about}<div>${detailsList(book, editing)}${editButton}</div></div>`;
 }
 
 // Offer "Show more" only when the description is actually cut off.
