@@ -549,6 +549,17 @@ function stats(_, params) {
   const rated = picked.filter((l) => l.rating);
   const pages = picked.reduce((n, l) => n + pagesOf(l), 0);
   const liked = picked.filter((l) => l.liked);
+  const knitted = picked.filter((l) => l.knitted);
+  // Tags group case-insensitively under their most-used spelling.
+  const spelling = new Map(store.allTags().map((t) => [t.toLowerCase(), t]));
+  const tagGroups = [...picked.reduce((m, l) => {
+    for (const t of l.tags || []) {
+      const g = m.get(t.toLowerCase()) || { tag: spelling.get(t.toLowerCase()) || t, entries: [] };
+      g.entries.push(l);
+      m.set(t.toLowerCase(), g);
+    }
+    return m;
+  }, new Map()).values()].sort((a, b) => b.entries.length - a.entries.length || a.tag.localeCompare(b.tag));
 
   // The timeline zooms with the filters: all years -> per year, one year -> per month, one month -> per day.
   let timeline;
@@ -608,6 +619,8 @@ function stats(_, params) {
       ${tile(pages.toLocaleString(), 'pages', drill('Pages', [...picked].sort((a, b) => pagesOf(b) - pagesOf(a)), { showPages: true }))}
       ${tile(rated.length ? (rated.reduce((n, l) => n + l.rating, 0) / rated.length).toFixed(1) : '—', 'average rating', drill('Rated books', [...rated].sort((a, b) => b.rating - a.rating)))}
       ${tile(liked.length, 'liked', drill('Liked', liked))}
+      ${tile(`🧶 ${knitted.length}`, 'knitted', drill('Knitted while reading', knitted),
+        picked.length ? `<small class="muted combo-line">${Math.round((knitted.length / picked.length) * 100)}% of books</small>` : '')}
     </div>
     <h2 class="section-title">How you read</h2>
     <div class="tile-row">
@@ -615,6 +628,10 @@ function stats(_, params) {
       ${tile(`🔀 ${combined.length}`, 'combination', drill('Combination', combined),
         combos.map(([k, entries]) => `<small class="muted combo-line">${esc(k)} · ${entries.length}</small>`).join(''))}
     </div>
+    <h2 class="section-title">Tags</h2>
+    ${tagGroups.length
+      ? `<div class="tag-cloud">${tagGroups.map((g) => `<button type="button" class="tag tag-stat" data-drill="${drill(`Tag: ${g.tag}`, g.entries)}" aria-label="${esc(g.tag)}: ${g.entries.length} ${g.entries.length === 1 ? 'book' : 'books'}">${esc(g.tag)}<span class="tag-count">${g.entries.length}</span></button>`).join('')}</div>`
+      : '<p class="muted">No tags in this period. Add tags when you log a book.</p>'}
     <h2 class="section-title">${timeline.title}</h2>${bars(timeline.buckets, timeline.title, true)}<div class="bar-labels">${timeline.ticks.map((l) => `<span>${esc(l)}</span>`).join('')}</div>
     <h2 class="section-title">Ratings</h2>${bars(ratingBuckets, 'Ratings')}<div class="bar-labels"><span class="stars">½</span><span class="stars">★★★★★</span></div>
     <div class="tile-row" style="margin-top:2rem">
