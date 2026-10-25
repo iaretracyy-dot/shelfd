@@ -570,12 +570,12 @@ function stats(_, params) {
   } else if (year === 'all') {
     const span = years.length ? [...years].reverse() : [thisYear];
     timeline = { title: 'Books per year', ticks: [span[0], '', span[span.length - 1]],
-      buckets: span.map((y) => ({ label: y, entries: picked.filter((l) => l.date.startsWith(y)) })) };
+      buckets: span.map((y) => ({ label: y, short: y, entries: picked.filter((l) => l.date.startsWith(y)) })) };
   } else {
     timeline = { title: 'Books per month', ticks: ['Jan', 'Jun', 'Dec'],
-      buckets: MONTHS.map((m, i) => ({ label: `${m} ${year}`, entries: picked.filter((l) => Number(l.date.slice(5, 7)) === i + 1) })) };
+      buckets: MONTHS.map((m, i) => ({ label: `${m} ${year}`, short: m.slice(0, 3), entries: picked.filter((l) => Number(l.date.slice(5, 7)) === i + 1) })) };
   }
-  const ratingBuckets = Array.from({ length: 10 }, (_, i) => ({ label: `Rated ${starsText((i + 1) / 2)}`, entries: rated.filter((l) => l.rating === (i + 1) / 2) }));
+  const ratingBuckets = Array.from({ length: 10 }, (_, i) => ({ label: `Rated ${starsText((i + 1) / 2)}`, short: `${i ? Math.floor((i + 1) / 2) || '' : ''}${i % 2 ? '' : '½'}★`, entries: rated.filter((l) => l.rating === (i + 1) / 2) }));
 
   // A read in one format counts toward that format; a read in two or more counts once, as a combination.
   const single = Object.keys(store.FORMATS).map((f) => [f, picked.filter((l) => l.formats?.length === 1 && l.formats[0] === f)]);
@@ -585,12 +585,16 @@ function stats(_, params) {
   const tile = (value, label, d, extra = '') =>
     `<button type="button" class="tile drill" data-drill="${d}" ${drills[d].entries.length ? '' : 'disabled'}><b>${value}</b><span class="muted">${label}</span>${extra}</button>`;
   // Timeline bars name their own period, so their drill-down skips the filter label.
-  const bars = (buckets, chartTitle, ownPeriod = false) => {
+  // Each bar shows its count on top. Charts of up to 12 bars label every bar; longer ones use the ticks.
+  const bars = (buckets, chartTitle, ticks, ownPeriod = false) => {
     const max = Math.max(1, ...buckets.map((b) => b.entries.length));
     return `<div class="bars">${buckets.map((b) => {
       const n = b.entries.length;
-      return `<button type="button" style="height:${(n / max) * 100}%" data-drill="${drill(b.label, b.entries, { ownPeriod })}" title="${esc(b.label)}: ${n}" aria-label="${esc(chartTitle)}, ${esc(b.label)}: ${n} ${n === 1 ? 'book' : 'books'}" ${n ? '' : 'disabled'}></button>`;
-    }).join('')}</div>`;
+      return `<button type="button" style="height:${(n / max) * 100}%" data-drill="${drill(b.label, b.entries, { ownPeriod })}" title="${esc(b.label)}: ${n}" aria-label="${esc(chartTitle)}, ${esc(b.label)}: ${n} ${n === 1 ? 'book' : 'books'}" ${n ? '' : 'disabled'}>${n ? `<span class="bar-n" aria-hidden="true">${n}</span>` : ''}</button>`;
+    }).join('')}</div>
+    ${buckets.length <= 12 && buckets.every((b) => b.short)
+      ? `<div class="bar-axis" aria-hidden="true">${buckets.map((b) => `<span>${esc(b.short)}</span>`).join('')}</div>`
+      : `<div class="bar-labels" aria-hidden="true">${ticks.map((t) => `<span>${esc(t)}</span>`).join('')}</div>`}`;
   };
   const top = (rows, what) => (rows.length
     ? `<ol>${rows.slice(0, 5).map(([k, entries]) => `<li><button type="button" class="link-btn" data-drill="${drill(`${what}: ${k}`, entries)}">${esc(k)}</button> <span class="muted">· ${entries.length}</span></li>`).join('')}</ol>`
@@ -632,8 +636,8 @@ function stats(_, params) {
     ${tagGroups.length
       ? `<div class="tag-cloud">${tagGroups.map((g) => `<button type="button" class="tag tag-stat" data-drill="${drill(`Tag: ${g.tag}`, g.entries)}" aria-label="${esc(g.tag)}: ${g.entries.length} ${g.entries.length === 1 ? 'book' : 'books'}">${esc(g.tag)}<span class="tag-count">${g.entries.length}</span></button>`).join('')}</div>`
       : '<p class="muted">No tags in this period. Add tags when you log a book.</p>'}
-    <h2 class="section-title">${timeline.title}</h2>${bars(timeline.buckets, timeline.title, true)}<div class="bar-labels">${timeline.ticks.map((l) => `<span>${esc(l)}</span>`).join('')}</div>
-    <h2 class="section-title">Ratings</h2>${bars(ratingBuckets, 'Ratings')}<div class="bar-labels"><span class="stars">½</span><span class="stars">★★★★★</span></div>
+    <h2 class="section-title">${timeline.title}</h2>${bars(timeline.buckets, timeline.title, timeline.ticks, true)}
+    <h2 class="section-title">Ratings</h2>${bars(ratingBuckets, 'Ratings', ['½★', '5★'])}
     <div class="tile-row" style="margin-top:2rem">
       <div><h2 class="section-title">Top authors</h2>${top(groupBy((l) => books[l.bookId].authors || []), 'Author')}</div>
       <div><h2 class="section-title">Top publishers</h2>${top(groupBy((l) => [books[l.bookId].publisher]), 'Publisher')}</div>

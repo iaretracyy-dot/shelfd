@@ -132,9 +132,13 @@ main { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; outline:
 .tile-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; }
 .tile { background: var(--surface); border-radius: var(--radius); padding: 1rem; }
 .tile b { display: block; font-size: 1.8rem; }
-.bars { display: flex; align-items: flex-end; gap: 4px; height: 90px; }
+.bars { display: flex; align-items: flex-end; gap: 4px; height: 110px; padding-top: 1.3rem; }
 .bars > * { flex: 1; background: var(--muted); border-radius: 2px 2px 0 0; min-height: 2px; border: 0; padding: 0; }
 .bars > button:not(:disabled) { cursor: pointer; }
+.bars > button { position: relative; }
+.bar-n { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); margin-bottom: 2px; font-size: .78rem; font-weight: 700; color: var(--text); white-space: nowrap; }
+.bar-axis { display: flex; gap: 4px; margin-top: .3rem; }
+.bar-axis span { flex: 1; text-align: center; color: var(--muted); font-size: .75rem; white-space: nowrap; overflow: hidden; }
 .bars > button:not(:disabled):hover, .bars > button:focus-visible { background: var(--green); outline: none; }
 .tile.drill { font: inherit; color: inherit; text-align: left; border: 1px solid transparent; cursor: pointer; display: block; width: 100%; }
 .tile.drill:not(:disabled):hover, .tile.drill:focus-visible { border-color: var(--green); outline: none; }
