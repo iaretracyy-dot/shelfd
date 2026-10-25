@@ -14,6 +14,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
   background: var(--bg);
@@ -145,6 +146,17 @@ dialog::backdrop { background: rgba(0,0,0,.7); }
 .field { display: grid; gap: .3rem; margin-bottom: 1rem; font-size: .85rem; color: var(--muted); }
 .field-row { display: flex; gap: 1rem; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; }
 .field-row .field { margin: 0; }
+.format-picker { border: 0; padding: 0; margin: 0 0 1rem; display: flex; flex-wrap: wrap; gap: .5rem; }
+.format-picker legend { font-size: .85rem; color: var(--muted); padding: 0; margin-bottom: .4rem; }
+.format-picker label { cursor: pointer; }
+.format-picker input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.format-picker label span { display: inline-block; padding: .4rem .8rem; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-weight: 600; font-size: .9rem; border: 1px solid transparent; }
+.format-picker label input:checked + span { background: rgba(64,188,244,.15); color: var(--blue); border-color: var(--blue); }
+.format-picker input:focus-visible + span { outline: 2px solid var(--blue); outline-offset: 2px; }
+.format-icons { color: var(--muted); font-size: .85rem; white-space: nowrap; }
+.filters { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+.filters label { display: grid; gap: .2rem; font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.filters select { width: auto; min-width: 9rem; }
 .check { display: flex; gap: .5rem; align-items: center; margin-bottom: 1rem; color: var(--muted); }
 .sheet-actions { display: flex; gap: .5rem; margin-top: 1rem; }
 #toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(150%); background: var(--green); color: #fff; padding: .6rem 1.1rem; border-radius: 999px; font-weight: 600; transition: transform .25s, opacity .25s; z-index: 10; opacity: 0; pointer-events: none; }

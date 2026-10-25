@@ -3,6 +3,7 @@
 
 const KEY = 'shelfd.v1';
 export const SHELVES = { want: 'Want to read', reading: 'Reading', read: 'Read', dnf: 'Did not finish' };
+export const FORMATS = { physical: 'Physical', ebook: 'Ebook', audio: 'Audiobook' };
 
 let state = load();
 const listeners = new Set();
@@ -77,6 +78,7 @@ export function saveLog(log) {
     rating: Number(log.rating) || 0,
     liked: !!log.liked,
     reread: !!log.reread,
+    formats: Object.keys(FORMATS).filter((f) => (log.formats || []).includes(f)),
     review: (log.review || '').trim(),
     createdAt: log.createdAt || new Date().toISOString(),
   };

@@ -16,6 +16,22 @@ function starsText(rating) {
   return '★'.repeat(Math.floor(rating)) + (rating % 1 ? '½' : '');
 }
 
+const FORMAT_ICONS = { physical: '📖', ebook: '📱', audio: '🎧' };
+function formatIcons(formats) {
+  if (!formats?.length) return '';
+  const label = formats.map((f) => store.FORMATS[f]).join(', ');
+  return `<span class="format-icons" title="${esc(label)}" aria-label="${esc(label)}">${formats.map((f) => FORMAT_ICONS[f]).join(' ')}</span>`;
+}
+
+// Best guess for a first log: the catalog's format field ("Paperback", "Kindle Edition", "Audio CD").
+function guessFormats(book) {
+  const f = String(book.format || '').toLowerCase();
+  if (/audio/.test(f)) return ['audio'];
+  if (/e-?book|kindle|electronic|epub|digital/.test(f)) return ['ebook'];
+  if (/paper|hard|cloth|mass market|print|board/.test(f)) return ['physical'];
+  return [];
+}
+
 function cover(book, size = '') {
   const cls = `cover ${size}`;
   if (book.coverUrl) return `<div class="${cls}"><img src="${esc(book.coverUrl)}" alt="" loading="lazy" onerror="this.remove()"></div>`;
@@ -325,7 +341,7 @@ function bookPage([id]) {
 function logItem(l) {
   return `<li>
     <div><b>${new Date(l.date + 'T00:00').toLocaleDateString(undefined, { dateStyle: 'medium' })}</b>
-      <span class="stars">${starsText(l.rating)}</span> ${l.liked ? '<span class="heart">♥</span>' : ''} ${l.reread ? '<span class="muted" title="Reread">↻</span>' : ''}
+      <span class="stars">${starsText(l.rating)}</span> ${l.liked ? '<span class="heart">♥</span>' : ''} ${l.reread ? '<span class="muted" title="Reread">↻</span>' : ''} ${formatIcons(l.formats)}
       <button type="button" class="btn small ghost" data-log="${esc(l.id)}">Edit</button></div>
     ${l.review ? `<p>${esc(l.review)}</p>` : ''}
   </li>`;
@@ -357,7 +373,7 @@ function diary() {
             ${cover(b, 'sm')}
             <div><h3>${esc(b.title)}</h3><span class="muted">${esc(authorsText(b.authors))}${b.pages ? ` · ${b.pages} pp` : ''}</span></div>
             <span class="stars">${starsText(l.rating)}</span>
-            <span class="icons">${l.liked ? '<span class="heart">♥</span>' : ''}${l.reread ? '<span title="Reread">↻</span>' : ''}${l.review ? '<span title="Has review">≡</span>' : ''}</span>
+            <span class="icons">${formatIcons(l.formats)}${l.liked ? '<span class="heart">♥</span>' : ''}${l.reread ? '<span title="Reread">↻</span>' : ''}${l.review ? '<span title="Has review">≡</span>' : ''}</span>
           </a>`;
         }).join('')}
       </section>`)
@@ -391,35 +407,77 @@ function library(_, params) {
 
 // ---------- stats ----------
 
+const MONTHS = Array.from({ length: 12 }, (_, i) => new Date(2000, i, 1).toLocaleDateString(undefined, { month: 'long' }));
+
 function stats(_, params) {
   const { books } = store.getState();
   const logs = store.allLogs().filter((l) => books[l.bookId]);
   const years = [...new Set(logs.map((l) => l.date.slice(0, 4)))].sort().reverse();
-  const year = params.get('year') || years[0] || String(new Date().getFullYear());
-  const inYear = logs.filter((l) => l.date.startsWith(year));
-  const rated = inYear.filter((l) => l.rating);
-  const pages = inYear.reduce((n, l) => n + (Number(books[l.bookId].pages) || 0), 0);
-  const perMonth = Array.from({ length: 12 }, (_, m) => inYear.filter((l) => Number(l.date.slice(5, 7)) === m + 1).length);
+  const thisYear = String(new Date().getFullYear());
+  const year = params.get('year') || (years.includes(thisYear) ? thisYear : years[0]) || thisYear;
+  const month = params.get('month') || 'all'; // '01'..'12' or 'all'
+  const picked = logs.filter((l) => (year === 'all' || l.date.startsWith(year)) && (month === 'all' || l.date.slice(5, 7) === month));
+
+  const rated = picked.filter((l) => l.rating);
+  const pages = picked.reduce((n, l) => n + (Number(books[l.bookId].pages) || 0), 0);
   const dist = Array.from({ length: 10 }, (_, i) => rated.filter((l) => l.rating === (i + 1) / 2).length);
-  const tally = (fn) => Object.entries(inYear.reduce((m, l) => (fn(books[l.bookId]).forEach((k) => k && (m[k] = (m[k] || 0) + 1)), m), {})).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const tally = (fn) => Object.entries(picked.reduce((m, l) => (fn(l).forEach((k) => k && (m[k] = (m[k] || 0) + 1)), m), {})).sort((a, b) => b[1] - a[1]).slice(0, 5);
   const bars = (arr) => `<div class="bars">${arr.map((n) => `<div style="height:${(n / Math.max(1, ...arr)) * 100}%" title="${n}"></div>`).join('')}</div>`;
   const top = (rows) => (rows.length ? `<ol>${rows.map(([k, n]) => `<li>${esc(k)} <span class="muted">· ${n}</span></li>`).join('')}</ol>` : '<p class="muted">—</p>');
 
+  // The timeline zooms with the filters: all years -> per year, one year -> per month, one month -> per day.
+  let timeline;
+  if (month !== 'all') {
+    const days = year === 'all' ? 31 : new Date(Number(year), Number(month), 0).getDate();
+    const counts = Array.from({ length: days }, (_, d) => picked.filter((l) => Number(l.date.slice(8, 10)) === d + 1).length);
+    timeline = { title: 'Books per day', counts, labels: ['1', String(Math.ceil(days / 2)), String(days)] };
+  } else if (year === 'all') {
+    const span = years.length ? [...years].reverse() : [thisYear];
+    timeline = { title: 'Books per year', counts: span.map((y) => picked.filter((l) => l.date.startsWith(y)).length), labels: [span[0], '', span[span.length - 1]] };
+  } else {
+    timeline = { title: 'Books per month', counts: Array.from({ length: 12 }, (_, m) => picked.filter((l) => Number(l.date.slice(5, 7)) === m + 1).length), labels: ['Jan', 'Jun', 'Dec'] };
+  }
+
+  const period = [month === 'all' ? '' : MONTHS[Number(month) - 1] + (year === 'all' ? ',' : ''), year === 'all' ? (month === 'all' ? 'All time' : 'all years') : year].filter(Boolean).join(' ');
+  const formatCounts = Object.keys(store.FORMATS).map((f) => [f, picked.filter((l) => l.formats?.includes(f)).length]);
+
   app.innerHTML = `
     <h1>Stats</h1>
-    <div class="tabs">${(years.length ? years : [year]).map((y) => `<a class="btn small" aria-pressed="${y === year}" href="#/stats?year=${y}">${y}</a>`).join('')}</div>
+    <form class="filters" id="stats-filters">
+      <label>Year
+        <select name="year">
+          <option value="all" ${year === 'all' ? 'selected' : ''}>All time</option>
+          ${(years.includes(thisYear) ? years : [thisYear, ...years]).map((y) => `<option ${y === year ? 'selected' : ''}>${y}</option>`).join('')}
+        </select>
+      </label>
+      <label>Month
+        <select name="month">
+          <option value="all">All months</option>
+          ${MONTHS.map((m, i) => { const v = String(i + 1).padStart(2, '0'); return `<option value="${v}" ${v === month ? 'selected' : ''}>${m}</option>`; }).join('')}
+        </select>
+      </label>
+    </form>
+    <p class="muted">${esc(period)} · ${picked.length} ${picked.length === 1 ? 'book' : 'books'}</p>
+    ${picked.length ? '' : '<div class="empty">No books logged in this period.</div>'}
     <div class="tile-row">
-      <div class="tile"><b>${inYear.length}</b><span class="muted">books</span></div>
+      <div class="tile"><b>${picked.length}</b><span class="muted">books</span></div>
       <div class="tile"><b>${pages.toLocaleString()}</b><span class="muted">pages</span></div>
       <div class="tile"><b>${rated.length ? (rated.reduce((n, l) => n + l.rating, 0) / rated.length).toFixed(1) : '—'}</b><span class="muted">average rating</span></div>
-      <div class="tile"><b>${inYear.filter((l) => l.liked).length}</b><span class="muted">liked</span></div>
+      <div class="tile"><b>${picked.filter((l) => l.liked).length}</b><span class="muted">liked</span></div>
     </div>
-    <h2 class="section-title">Books per month</h2>${bars(perMonth)}<div class="bar-labels"><span>Jan</span><span>Jun</span><span>Dec</span></div>
+    <h2 class="section-title">How you read</h2>
+    <div class="tile-row">${formatCounts.map(([f, n]) => `<div class="tile"><b>${FORMAT_ICONS[f]} ${n}</b><span class="muted">${store.FORMATS[f].toLowerCase()}</span></div>`).join('')}</div>
+    <h2 class="section-title">${timeline.title}</h2>${bars(timeline.counts)}<div class="bar-labels">${timeline.labels.map((l) => `<span>${esc(l)}</span>`).join('')}</div>
     <h2 class="section-title">Ratings</h2>${bars(dist)}<div class="bar-labels"><span class="stars">½</span><span class="stars">★★★★★</span></div>
     <div class="tile-row" style="margin-top:2rem">
-      <div><h2 class="section-title">Top authors</h2>${top(tally((b) => b.authors || []))}</div>
-      <div><h2 class="section-title">Top publishers</h2>${top(tally((b) => [b.publisher]))}</div>
+      <div><h2 class="section-title">Top authors</h2>${top(tally((l) => books[l.bookId].authors || []))}</div>
+      <div><h2 class="section-title">Top publishers</h2>${top(tally((l) => [books[l.bookId].publisher]))}</div>
     </div>`;
+
+  $('#stats-filters').addEventListener('change', (e) => {
+    const f = e.currentTarget;
+    location.hash = `#/stats?year=${f.year.value}&month=${f.month.value}`;
+  });
 }
 
 // ---------- log dialog ----------
@@ -475,10 +533,14 @@ function openLogDialog(book, log, beforeSave) {
   $('#log-title').textContent = book.title;
   $('#log-author').textContent = authorsText(book.authors);
   $('#log-cover').src = book.coverUrl || '';
+  $('#log-cover').hidden = !book.coverUrl;
   logForm.date.value = log?.date || today();
   logForm.liked.checked = !!log?.liked;
   logForm.reread.checked = log ? log.reread : store.logsFor(book.id || '').length > 0;
   logForm.review.value = log?.review || '';
+  // New entries reuse the formats from this book's last read, else guess from the edition.
+  const formats = log ? log.formats || [] : store.logsFor(book.id || '')[0]?.formats || guessFormats(book);
+  logForm.querySelectorAll('[name=formats]').forEach((cb) => (cb.checked = formats.includes(cb.value)));
   $('#log-delete').hidden = !log;
   paintStars(log?.rating || 0);
   logDialog.showModal();
@@ -496,6 +558,7 @@ logDialog.addEventListener('close', () => {
     rating: Number(starsInput.dataset.value),
     liked: logForm.liked.checked,
     reread: logForm.reread.checked,
+    formats: [...logForm.querySelectorAll('[name=formats]:checked')].map((cb) => cb.value),
     review: logForm.review.value,
   });
   logContext = null;
