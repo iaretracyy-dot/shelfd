@@ -13,7 +13,7 @@ export function setGoogleKey(key) {
 
 async function getJSON(url, signal) {
   const res = await fetch(url, { signal, headers: { Accept: 'application/json' } });
-  if (!res.ok) throw new Error(`${res.status} ${url}`);
+  if (!res.ok) throw Object.assign(new Error(`${res.status} ${url}`), { status: res.status });
   return res.json();
 }
 
@@ -24,9 +24,32 @@ const isISBN = (q) => /^(97[89])?\d{9}[\dXx]$/.test(q.replace(/[-\s]/g, ''));
 
 // ---------- search ----------
 
+// Returns { results, issues, relaxed }:
+//   issues  - catalogs that failed, e.g. [{ source: 'Google Books', reason: 'limit' }]
+//   relaxed - the looser query used when the exact one found nothing ('' otherwise)
 export async function searchCatalog(query, { signal } = {}) {
   const q = query.trim();
-  if (!q) return [];
+  if (!q) return { results: [], issues: [], relaxed: '' };
+  const exact = await runSearch(q, signal);
+  if (exact.results.length || isISBN(q)) return { ...exact, relaxed: '' };
+  // Catalogs require every word to match, so one stray word ("the", or "hk" for "H. K.") hides the book.
+  const relaxed = relaxQuery(q);
+  if (!relaxed || relaxed === q.toLowerCase()) return { ...exact, relaxed: '' };
+  const loose = await runSearch(relaxed, signal);
+  return { results: loose.results, issues: loose.issues.length ? loose.issues : exact.issues, relaxed: loose.results.length ? relaxed : '' };
+}
+
+const STOPWORDS = new Set(['the', 'a', 'an', 'of', 'and', 'by', 'to', 'in', 'on', 'for']);
+export function relaxQuery(q) {
+  return q
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter((w) => /^\d+$/.test(w) || (w.length > 2 && !STOPWORDS.has(w)))
+    .join(' ');
+}
+
+async function runSearch(q, signal) {
   const [ol, gb] = await Promise.allSettled([searchOpenLibrary(q, signal), searchGoogle(q, signal)]);
   if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
   const results = ol.status === 'fulfilled' ? ol.value : [];
@@ -38,10 +61,16 @@ export async function searchCatalog(query, { signal } = {}) {
       results.push(r);
     }
   }
-  if (!results.length && ol.status === 'rejected' && gb.status === 'rejected') {
-    throw new Error('The book catalogs could not be reached. Check your connection and try again.');
-  }
-  return results;
+  const issues = [];
+  if (ol.status === 'rejected') issues.push({ source: 'Open Library', reason: failureReason(ol.reason) });
+  if (gb.status === 'rejected') issues.push({ source: 'Google Books', reason: failureReason(gb.reason) });
+  return { results, issues };
+}
+
+function failureReason(err) {
+  if (err?.status === 429) return 'limit';
+  if (googleKey && (err?.status === 400 || err?.status === 403)) return 'key';
+  return 'offline';
 }
 
 function dedupeKey(r) {

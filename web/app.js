@@ -1,4 +1,4 @@
-import { initImprints } from './imprints.js';
+import { initImprints, resolvePublisher } from './imprints.js';
 import { searchCatalog, loadBookDetails, selectEdition, setGoogleKey } from './catalog.js';
 import * as store from './store.js';
 
@@ -53,7 +53,7 @@ function parseHash() {
 
 // ---------- router ----------
 
-const routes = { '': home, search, preview, book: bookPage, diary, library, stats };
+const routes = { '': home, search, preview, add: addManually, book: bookPage, diary, library, stats };
 let currentAbort = null;
 
 function render() {
@@ -132,17 +132,35 @@ async function search(_, params, signal) {
   if (!q) return;
 
   try {
-    const results = await searchCatalog(q, { signal });
+    const { results, issues, relaxed } = await searchCatalog(q, { signal });
     if (signal.aborted) return;
     results.forEach((r) => resultCache.set(r.id, r));
-    $('#results').innerHTML = results.length
-      ? `<p class="muted">${results.length} results for “${esc(q)}”. Select the book you read.</p>
-         <ul class="results">${results.map(resultRow).join('')}</ul>`
-      : `<div class="empty">No books found for “${esc(q)}”. Try fewer words or search by ISBN.</div>`;
+    const allFailed = issues.length === 2;
+    const manual = `<div class="manual-cta">Can't find your book? New releases can take a while to reach the catalogs.
+      <a class="btn small" href="#/add">＋ Add it manually</a></div>`;
+    $('#results').innerHTML = `
+      ${issues.map(issueNotice).join('')}
+      ${results.length
+        ? `<p class="muted">${relaxed ? `No exact matches for “${esc(q)}”. Showing results for <b>“${esc(relaxed)}”</b>.` : `${results.length} results for “${esc(q)}”.`} Select the book you read.</p>
+           <ul class="results">${results.map(resultRow).join('')}</ul>`
+        : allFailed
+          ? `<div class="empty">Couldn't reach the book catalogs, so this search didn't run. Check your connection and try again.</div>`
+          : `<div class="empty">No books found for “${esc(q)}”${issues.length ? ' in the catalog that responded' : ''}. Try fewer words, or search by ISBN.</div>`}
+      ${manual}`;
   } catch (err) {
     if (err.name === 'AbortError') return;
     $('#results').innerHTML = `<div class="empty">${esc(err.message)}</div>`;
   }
+}
+
+function issueNotice({ source, reason }) {
+  const text = {
+    limit: `${source} has hit its free request limit, so results may be missing books (especially new releases).
+      <a href="#" data-open-settings>Add a free Google Books API key</a> to get your own limit.`,
+    key: `${source} rejected your API key. <a href="#" data-open-settings>Check it in Settings</a>.`,
+    offline: `${source} didn't respond, so results may be incomplete. Try again in a moment.`,
+  }[reason];
+  return `<div class="notice" role="status">⚠ ${text}</div>`;
 }
 
 function resultRow(r) {
@@ -179,7 +197,10 @@ function resultFromId(id) {
   return null;
 }
 
+// Fields marked editOnly appear only while editing.
 const DETAIL_FIELDS = [
+  ['title', 'Title', true],
+  ['subtitle', 'Subtitle', true],
   ['authors', 'Author'],
   ['publisher', 'Publisher'],
   ['imprint', 'Imprint'],
@@ -190,10 +211,12 @@ const DETAIL_FIELDS = [
   ['isbn10', 'ISBN-10'],
   ['format', 'Format'],
   ['language', 'Language'],
+  ['coverUrl', 'Cover image URL', true],
 ];
 
 function detailsList(book, editing) {
-  return `<dl class="details">${DETAIL_FIELDS.map(([key, label]) => {
+  return `<dl class="details">${DETAIL_FIELDS.map(([key, label, editOnly]) => {
+    if (editOnly && !editing) return '';
     const raw = key === 'authors' ? (book.authors || []).join(', ') : book[key];
     if (!editing && !raw && key !== 'imprint' && key !== 'pages') return '';
     const value = editing
@@ -209,6 +232,7 @@ function readEdits(form, book) {
     const el = form.elements[key];
     if (!el) continue;
     const v = el.value.trim();
+    if (key === 'title' && !v) continue;
     out[key] = key === 'authors' ? v.split(',').map((s) => s.trim()).filter(Boolean) : key === 'pages' ? Number(v) || null : v;
   }
   return out;
@@ -271,6 +295,74 @@ function renderPreview(state, signal) {
     const draft = current();
     openLogDialog(draft, null, () => store.saveBook(draft, { shelf: 'read' }));
   });
+}
+
+// ---------- add a book manually ----------
+
+const MANUAL_FORMATS = ['', 'Hardcover', 'Paperback', 'Mass market paperback', 'Ebook', 'Audiobook'];
+
+function addManually() {
+  app.innerHTML = `
+    <h1>Add a book</h1>
+    <p class="muted">For books the catalogs don't have yet. Only the title and author are required, and you can edit everything later.</p>
+    <form class="manual-form" id="manual-form" novalidate>
+      <label class="field wide">Title * <input name="title" required autofocus></label>
+      <label class="field wide">Subtitle <input name="subtitle"></label>
+      <label class="field wide">Author(s) * <input name="authors" required placeholder="Separate several authors with commas"></label>
+      <label class="field">Publisher <input name="publisher" placeholder="e.g. Flatiron Books"></label>
+      <label class="field">Imprint <input name="imprint"></label>
+      <p class="hint wide muted">Enter an imprint like “Flatiron Books” as the publisher and we'll fill in the parent house (Macmillan) for you.</p>
+      <label class="field">Pages <input name="pages" inputmode="numeric" pattern="[0-9]*"></label>
+      <label class="field">Published <input name="publishedDate" placeholder="e.g. June 9, 2026"></label>
+      <label class="field">ISBN-13 <input name="isbn13" inputmode="numeric"></label>
+      <label class="field">ISBN-10 <input name="isbn10"></label>
+      <label class="field">Format <select name="format">${MANUAL_FORMATS.map((f) => `<option value="${f}">${f || '—'}</option>`).join('')}</select></label>
+      <label class="field">Cover image URL <input name="coverUrl" type="url" placeholder="https://…"></label>
+      <label class="field wide">Description <textarea name="description" rows="4"></textarea></label>
+      <div class="wide manual-actions">
+        <button type="button" class="btn primary" data-act="log">＋ Log this book</button>
+        <button type="button" class="btn" data-shelf="reading">Reading</button>
+        <button type="button" class="btn" data-shelf="want">Want to read</button>
+      </div>
+    </form>`;
+
+  const form = $('#manual-form');
+  // Typing a known imprint into Publisher fills both fields.
+  form.publisher.addEventListener('change', () => {
+    if (form.imprint.value.trim()) return;
+    const { publisher, imprint } = resolvePublisher([form.publisher.value]);
+    if (imprint) {
+      form.publisher.value = publisher;
+      form.imprint.value = imprint;
+    }
+  });
+
+  const read = () => {
+    for (const el of [form.title, form.authors]) el.value = el.value.trim();
+    if (!form.reportValidity()) return null;
+    const v = (name) => form.elements[name].value.trim();
+    return {
+      source: 'manual', workKey: '', editionKey: '', googleId: '',
+      title: v('title'), subtitle: v('subtitle'),
+      authors: v('authors').split(',').map((s) => s.trim()).filter(Boolean),
+      publisher: v('publisher'), imprint: v('imprint'), pages: Number(v('pages')) || null,
+      publishedDate: v('publishedDate'), firstPublished: '', isbn13: v('isbn13').replace(/[-\s]/g, ''), isbn10: v('isbn10').replace(/[-\s]/g, ''),
+      format: v('format'), language: '', coverUrl: v('coverUrl'), description: v('description'), subjects: [],
+    };
+  };
+  form.querySelector('[data-act="log"]').addEventListener('click', () => {
+    const book = read();
+    if (book) openLogDialog(book, null, () => store.saveBook(book, { shelf: 'read' }));
+  });
+  form.querySelectorAll('[data-shelf]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      const book = read();
+      if (!book) return;
+      const saved = store.saveBook(book, { shelf: btn.dataset.shelf });
+      toast(`Added to ${store.SHELVES[btn.dataset.shelf]}`);
+      location.hash = `#/book/${encodeURIComponent(saved.id)}`;
+    }),
+  );
 }
 
 // ---------- library book page ----------
@@ -615,6 +707,12 @@ $('#import-file').addEventListener('change', async (e) => {
 });
 
 // ---------- boot ----------
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('[data-open-settings]')) return;
+  e.preventDefault();
+  $('#settings-btn').click();
+});
 
 $('#quick-search').addEventListener('submit', (e) => {
   e.preventDefault();

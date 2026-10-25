@@ -153,6 +153,14 @@ dialog::backdrop { background: rgba(0,0,0,.7); }
 .format-picker label span { display: inline-block; padding: .4rem .8rem; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-weight: 600; font-size: .9rem; border: 1px solid transparent; }
 .format-picker label input:checked + span { background: rgba(64,188,244,.15); color: var(--blue); border-color: var(--blue); }
 .format-picker input:focus-visible + span { outline: 2px solid var(--blue); outline-offset: 2px; }
+.notice { background: rgba(255,128,0,.12); border: 1px solid rgba(255,128,0,.45); color: #ffc58a; border-radius: var(--radius); padding: .6rem .9rem; margin-bottom: 1rem; font-size: .9rem; }
+.notice a { color: #fff; text-decoration: underline; }
+.manual-cta { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 1.5rem; padding: 1rem; border: 1px dashed var(--line); border-radius: var(--radius); color: var(--muted); }
+.manual-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem; max-width: 640px; margin-top: 1.25rem; }
+.manual-form .wide { grid-column: 1 / -1; }
+.manual-form .hint { font-size: .8rem; margin: -.5rem 0 1rem; }
+.manual-actions { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .5rem; }
+@media (max-width: 720px) { .manual-form { grid-template-columns: 1fr; } }
 .combo-line { display: block; font-size: .75rem; margin-top: .2rem; }
 .format-icons { color: var(--muted); font-size: .85rem; white-space: nowrap; }
 .filters { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
