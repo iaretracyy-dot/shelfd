@@ -3,3 +3,4 @@ ios/*.xcodeproj/
 xcuserdata/
 DerivedData/
 node_modules/
+shelfd-*.zip
