@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shelfd</title>
+  <meta name="description" content="Log the books you read, rate them, and keep a reading diary." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a href="#/" class="brand"><span class="dots"><i></i><i></i><i></i></span>Shelfd</a>
+    <nav>
+      <a href="#/" data-nav="home">Home</a>
+      <a href="#/diary" data-nav="diary">Diary</a>
+      <a href="#/library" data-nav="library">Library</a>
+      <a href="#/stats" data-nav="stats">Stats</a>
+    </nav>
+    <form class="quick-search" id="quick-search" role="search">
+      <input type="search" name="q" placeholder="Search books, authors, ISBN" aria-label="Search the catalog" autocomplete="off" />
+    </form>
+    <button class="icon-btn" id="settings-btn" aria-label="Settings" title="Settings">⚙</button>
+  </header>
+
+  <main id="app" tabindex="-1"></main>
+
+  <dialog id="log-dialog" class="sheet">
+    <form method="dialog" id="log-form">
+      <div class="sheet-head">
+        <img id="log-cover" alt="" />
+        <div>
+          <p class="eyebrow">I read…</p>
+          <h2 id="log-title"></h2>
+          <p class="muted" id="log-author"></p>
+        </div>
+      </div>
+      <label class="field">Finished on <input type="date" name="date" required /></label>
+      <div class="field-row">
+        <div class="field">Rating <div class="stars-input" id="stars-input" role="slider" aria-label="Rating" aria-valuemin="0" aria-valuemax="5" tabindex="0"></div></div>
+        <label class="like-toggle"><input type="checkbox" name="liked" /> <span aria-hidden="true">♥</span> Like</label>
+      </div>
+      <label class="check"><input type="checkbox" name="reread" /> I've read this before</label>
+      <label class="field">Review <textarea name="review" rows="5" placeholder="Add a review…"></textarea></label>
+      <div class="sheet-actions">
+        <button type="button" class="btn ghost danger" id="log-delete" hidden>Delete entry</button>
+        <span class="spacer"></span>
+        <button value="cancel" class="btn ghost" formnovalidate>Cancel</button>
+        <button value="save" class="btn primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="settings-dialog" class="sheet">
+    <form method="dialog">
+      <h2>Settings</h2>
+      <label class="field">Google Books API key <span class="muted">(optional — raises the search limit)</span>
+        <input name="googleKey" autocomplete="off" spellcheck="false" />
+      </label>
+      <h3>Your data</h3>
+      <p class="muted">Everything is saved in this browser. Export a backup or move your library to the iOS app.</p>
+      <div class="field-row">
+        <button type="button" class="btn" id="export-btn">Export JSON</button>
+        <label class="btn">Import JSON<input type="file" id="import-file" accept="application/json,.json" hidden /></label>
+      </div>
+      <div class="sheet-actions"><span class="spacer"></span><button value="save" class="btn primary">Done</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

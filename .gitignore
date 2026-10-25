@@ -1,0 +1,5 @@
+.DS_Store
+ios/*.xcodeproj/
+xcuserdata/
+DerivedData/
+node_modules/

@@ -1,0 +1,50 @@
+{
+  "_comment": "Imprint -> parent publisher. Catalogs usually list the imprint printed on the book; this map fills in the parent house. Shared by the web and iOS apps.",
+  "Penguin Random House": [
+    "Penguin", "Penguin Books", "Penguin Classics", "Penguin Press", "Viking", "Viking Press", "Riverhead", "Riverhead Books",
+    "Putnam", "G. P. Putnam's Sons", "Berkley", "Dutton", "Plume", "Ace", "DAW", "Portfolio", "Puffin", "Razorbill",
+    "Philomel", "Random House", "Ballantine", "Ballantine Books", "Bantam", "Bantam Books", "Del Rey", "Dell",
+    "Crown", "Crown Publishing", "Clarkson Potter", "Ten Speed Press", "Doubleday", "Anchor", "Anchor Books",
+    "Knopf", "Alfred A. Knopf", "Pantheon", "Pantheon Books", "Schocken", "Vintage", "Vintage Books",
+    "Vintage International", "Vintage Classics", "Everyman's Library", "Hogarth", "Modern Library", "Spiegel & Grau",
+    "Delacorte", "Delacorte Press", "Random House Children's Books", "Golden Books", "Ladybird", "Hamish Hamilton",
+    "Jonathan Cape", "Chatto & Windus", "Harvill Secker", "Bodley Head", "Ebury", "Transworld", "Corgi",
+    "Fig Tree", "Allen Lane", "Michael Joseph", "Century", "Arrow", "Windmill Books", "Del Rey Books"
+  ],
+  "HarperCollins": [
+    "Harper", "Harper Perennial", "Harper Perennial Modern Classics", "HarperOne", "Harper Voyager", "Harper Business",
+    "Harper Design", "HarperTeen", "Harper Collins", "William Morrow", "Morrow", "Avon", "Avon Books", "Ecco",
+    "Ecco Press", "Mariner", "Mariner Books", "Houghton Mifflin Harcourt", "Houghton Mifflin", "Harcourt",
+    "Amistad", "Custom House", "Dey Street", "Harlequin", "HQ", "Mira", "Fourth Estate", "4th Estate",
+    "William Collins", "Collins", "Voyager", "Thomas Nelson", "Zondervan", "Greenwillow", "Katherine Tegen Books",
+    "Balzer + Bray", "Clarion Books", "Bourbon Street Books", "Harper & Row", "Harper & Brothers"
+  ],
+  "Simon & Schuster": [
+    "Simon & Schuster", "Scribner", "Charles Scribner's Sons", "Atria", "Atria Books", "Emily Bestler Books",
+    "Gallery Books", "Pocket Books", "Threshold Editions", "Free Press", "Touchstone", "Avid Reader Press",
+    "Marysue Rucci Books", "One Signal", "Saga Press", "Simon & Schuster Books for Young Readers",
+    "Atheneum", "Margaret K. McElderry Books", "Aladdin", "Simon Pulse", "Beach Lane Books", "Salaam Reads",
+    "Washington Square Press", "Howard Books", "Folger Shakespeare Library"
+  ],
+  "Hachette Book Group": [
+    "Little, Brown", "Little, Brown and Company", "Little Brown", "Back Bay Books", "Mulholland Books",
+    "Little, Brown Books for Young Readers", "Grand Central", "Grand Central Publishing", "Forever", "Twelve",
+    "Hachette Books", "Basic Books", "PublicAffairs", "Public Affairs", "Bold Type Books", "Seal Press",
+    "Running Press", "Orbit", "Redhook", "Workman", "Algonquin", "Algonquin Books", "Artisan", "FaithWords",
+    "Hodder & Stoughton", "Hodder", "John Murray", "Sceptre", "Headline", "Quercus", "Orion", "Gollancz",
+    "Weidenfeld & Nicolson", "Abacus", "Sphere", "Virago", "Fleet", "Piatkus", "Octopus", "Wildfire"
+  ],
+  "Macmillan": [
+    "Farrar, Straus and Giroux", "Farrar, Straus & Giroux", "FSG", "Farrar Straus Giroux", "MCD",
+    "Henry Holt", "Henry Holt and Company", "Holt", "Metropolitan Books", "Picador", "Picador USA",
+    "St. Martin's Press", "St. Martin's Griffin", "Minotaur", "Minotaur Books", "Flatiron", "Flatiron Books",
+    "Celadon", "Celadon Books", "Tor", "Tor Books", "Tor.com", "Tordotcom", "Forge", "Nightfire",
+    "Feiwel & Friends", "Roaring Brook Press", "Square Fish", "Macmillan", "Pan", "Pan Books", "Pan Macmillan",
+    "Mantle", "Bluebird", "Tor Teen"
+  ],
+  "Bloomsbury": ["Bloomsbury", "Bloomsbury Publishing", "Bloomsbury USA", "Bloomsbury Circus", "Raven Books"],
+  "W. W. Norton": ["W. W. Norton", "W.W. Norton & Company", "Norton", "Liveright", "Countryman Press"],
+  "Scholastic": ["Scholastic", "Scholastic Press", "Arthur A. Levine Books", "Graphix", "Chicken House"],
+  "Oxford University Press": ["Oxford University Press", "Oxford World's Classics", "OUP"],
+  "Grove Atlantic": ["Grove Press", "Grove", "Atlantic Monthly Press", "Black Cat", "Mysterious Press"]
+}
