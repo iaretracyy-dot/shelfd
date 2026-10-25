@@ -439,7 +439,10 @@ function stats(_, params) {
   }
 
   const period = [month === 'all' ? '' : MONTHS[Number(month) - 1] + (year === 'all' ? ',' : ''), year === 'all' ? (month === 'all' ? 'All time' : 'all years') : year].filter(Boolean).join(' ');
-  const formatCounts = Object.keys(store.FORMATS).map((f) => [f, picked.filter((l) => l.formats?.includes(f)).length]);
+  // A read in one format counts toward that format; a read in two or more counts once, as a combination.
+  const formatCounts = Object.keys(store.FORMATS).map((f) => [f, picked.filter((l) => l.formats?.length === 1 && l.formats[0] === f).length]);
+  const combos = tally((l) => (l.formats?.length > 1 ? [l.formats.map((f) => store.FORMATS[f]).join(' + ')] : []));
+  const comboTotal = picked.filter((l) => l.formats?.length > 1).length;
 
   app.innerHTML = `
     <h1>Stats</h1>
@@ -466,7 +469,10 @@ function stats(_, params) {
       <div class="tile"><b>${picked.filter((l) => l.liked).length}</b><span class="muted">liked</span></div>
     </div>
     <h2 class="section-title">How you read</h2>
-    <div class="tile-row">${formatCounts.map(([f, n]) => `<div class="tile"><b>${FORMAT_ICONS[f]} ${n}</b><span class="muted">${store.FORMATS[f].toLowerCase()}</span></div>`).join('')}</div>
+    <div class="tile-row">${formatCounts.map(([f, n]) => `<div class="tile"><b>${FORMAT_ICONS[f]} ${n}</b><span class="muted">${store.FORMATS[f].toLowerCase()}</span></div>`).join('')}
+      <div class="tile"><b>🔀 ${comboTotal}</b><span class="muted">combination</span>
+        ${combos.map(([k, n]) => `<small class="muted combo-line">${esc(k)} · ${n}</small>`).join('')}</div>
+    </div>
     <h2 class="section-title">${timeline.title}</h2>${bars(timeline.counts)}<div class="bar-labels">${timeline.labels.map((l) => `<span>${esc(l)}</span>`).join('')}</div>
     <h2 class="section-title">Ratings</h2>${bars(dist)}<div class="bar-labels"><span class="stars">½</span><span class="stars">★★★★★</span></div>
     <div class="tile-row" style="margin-top:2rem">

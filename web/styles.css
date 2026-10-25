@@ -153,6 +153,7 @@ dialog::backdrop { background: rgba(0,0,0,.7); }
 .format-picker label span { display: inline-block; padding: .4rem .8rem; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-weight: 600; font-size: .9rem; border: 1px solid transparent; }
 .format-picker label input:checked + span { background: rgba(64,188,244,.15); color: var(--blue); border-color: var(--blue); }
 .format-picker input:focus-visible + span { outline: 2px solid var(--blue); outline-offset: 2px; }
+.combo-line { display: block; font-size: .75rem; margin-top: .2rem; }
 .format-icons { color: var(--muted); font-size: .85rem; white-space: nowrap; }
 .filters { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
 .filters label { display: grid; gap: .2rem; font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
