@@ -23,6 +23,9 @@ function formatIcons(formats) {
   return `<span class="format-icons" title="${esc(label)}" aria-label="${esc(label)}">${formats.map((f) => FORMAT_ICONS[f]).join(' ')}</span>`;
 }
 
+const knitIcon = (l) => (l.knitted ? '<span title="Knitted while reading" aria-label="Knitted while reading">🧶</span>' : '');
+const tagList = (tags) => (tags?.length ? `<span class="tag-list">${tags.map((t) => `<span class="tag">${esc(t)}</span>`).join('')}</span>` : '');
+
 // Best guess for a first log: the catalog's format field ("Paperback", "Kindle Edition", "Audio CD").
 function guessFormats(book) {
   const f = String(book.format || '').toLowerCase();
@@ -455,8 +458,9 @@ function bookPage([id]) {
 function logItem(l) {
   return `<li>
     <div><b>${new Date(l.date + 'T00:00').toLocaleDateString(undefined, { dateStyle: 'medium' })}</b>
-      <span class="stars">${starsText(l.rating)}</span> ${l.liked ? '<span class="heart">♥</span>' : ''} ${l.reread ? '<span class="muted" title="Reread">↻</span>' : ''} ${formatIcons(l.formats)}
+      <span class="stars">${starsText(l.rating)}</span> ${l.liked ? '<span class="heart">♥</span>' : ''} ${l.reread ? '<span class="muted" title="Reread">↻</span>' : ''} ${formatIcons(l.formats)} ${knitIcon(l)}
       <button type="button" class="btn small ghost" data-log="${esc(l.id)}">Edit</button></div>
+    ${l.tags?.length ? `<div class="log-tags">${tagList(l.tags)}</div>` : ''}
     ${l.review ? `<p>${esc(l.review)}</p>` : ''}
   </li>`;
 }
@@ -485,9 +489,9 @@ function diary() {
           return `<a class="diary-row" href="#/book/${encodeURIComponent(b.id)}">
             <span class="diary-day">${Number(l.date.slice(8, 10))}</span>
             ${cover(b, 'sm')}
-            <div><h3>${esc(b.title)}</h3><span class="muted">${esc(authorsText(b.authors))}${b.pages ? ` · ${b.pages} pp` : ''}</span></div>
+            <div><h3>${esc(b.title)}</h3><span class="muted">${esc(authorsText(b.authors))}${b.pages ? ` · ${b.pages} pp` : ''}</span>${l.tags?.length ? `<div class="log-tags">${tagList(l.tags)}</div>` : ''}</div>
             <span class="stars">${starsText(l.rating)}</span>
-            <span class="icons">${formatIcons(l.formats)}${l.liked ? '<span class="heart">♥</span>' : ''}${l.reread ? '<span title="Reread">↻</span>' : ''}${l.review ? '<span title="Has review">≡</span>' : ''}</span>
+            <span class="icons">${formatIcons(l.formats)}${knitIcon(l)}${l.liked ? '<span class="heart">♥</span>' : ''}${l.reread ? '<span title="Reread">↻</span>' : ''}${l.review ? '<span title="Has review">≡</span>' : ''}</span>
           </a>`;
         }).join('')}
       </section>`)
@@ -636,7 +640,7 @@ function openDrill({ title, entries, showPages, ownPeriod }, period) {
     return `<li><a class="drill-row" href="#/book/${encodeURIComponent(b.id)}">
       ${cover(b, 'sm')}
       <div><h3>${esc(b.title)}</h3><span class="muted">${esc(authorsText(b.authors))}</span><br>
-        <span class="muted">${esc(meta)}</span> <span class="stars">${starsText(l.rating)}</span> ${l.liked ? '<span class="heart">♥</span>' : ''} ${formatIcons(l.formats)}</div>
+        <span class="muted">${esc(meta)}</span> <span class="stars">${starsText(l.rating)}</span> ${l.liked ? '<span class="heart">♥</span>' : ''} ${formatIcons(l.formats)} ${knitIcon(l)}${l.tags?.length ? `<div class="log-tags">${tagList(l.tags)}</div>` : ''}</div>
     </a></li>`;
   }).join('');
   drillDialog.showModal();
@@ -693,6 +697,121 @@ function paintPreview(r) {
   });
 }
 
+// ---------- tag input ----------
+// Type to filter existing tags; Enter or comma adds the highlighted suggestion,
+// or creates a new tag when nothing matches. Matching ignores case.
+
+const tagEntry = $('#tag-entry');
+const tagChips = $('#tag-chips');
+const tagSuggest = $('#tag-suggestions');
+let tagState = [];
+let tagOptions = [];
+let tagActive = -1;
+const sameTag = (a, b) => a.toLowerCase() === b.toLowerCase();
+
+function setTags(tags) {
+  tagState = store.cleanTags(tags);
+  tagEntry.value = '';
+  renderTagChips();
+  closeTagSuggestions();
+}
+
+function renderTagChips() {
+  tagChips.innerHTML = tagState
+    .map((t, i) => `<li class="tag">${esc(t)}<button type="button" data-remove-tag="${i}" aria-label="Remove tag ${esc(t)}">×</button></li>`)
+    .join('');
+}
+
+function addTag(raw) {
+  const typed = String(raw).trim().replace(/\s+/g, ' ');
+  if (!typed) return;
+  const tag = store.allTags().find((t) => sameTag(t, typed)) || typed; // reuse the existing spelling
+  if (!tagState.some((t) => sameTag(t, tag))) tagState.push(tag);
+  tagEntry.value = '';
+  renderTagChips();
+  renderTagSuggestions();
+}
+
+function renderTagSuggestions() {
+  const q = tagEntry.value.trim().replace(/\s+/g, ' ');
+  const available = store.allTags().filter((t) => !tagState.some((s) => sameTag(s, t)));
+  const matches = (q ? available.filter((t) => t.toLowerCase().includes(q.toLowerCase())) : available).slice(0, 8);
+  tagOptions = matches.map((t) => ({ value: t, label: esc(t) }));
+  if (q && ![...available, ...tagState].some((t) => sameTag(t, q))) {
+    tagOptions.push({ value: q, label: `Create “${esc(q)}”`, create: true });
+  }
+  tagActive = q && tagOptions.length ? 0 : -1;
+  if (!tagOptions.length || document.activeElement !== tagEntry) return closeTagSuggestions();
+  paintTagSuggestions();
+  tagSuggest.hidden = false;
+  tagEntry.setAttribute('aria-expanded', 'true');
+}
+
+function paintTagSuggestions() {
+  tagSuggest.innerHTML = tagOptions
+    .map((o, i) => `<li role="option" id="tag-opt-${i}" data-tag-index="${i}" class="${o.create ? 'create' : ''}" aria-selected="${i === tagActive}">${o.label}</li>`)
+    .join('');
+  if (tagActive >= 0) tagEntry.setAttribute('aria-activedescendant', `tag-opt-${tagActive}`);
+  else tagEntry.removeAttribute('aria-activedescendant');
+}
+
+function closeTagSuggestions() {
+  tagSuggest.hidden = true;
+  tagActive = -1;
+  tagEntry.setAttribute('aria-expanded', 'false');
+  tagEntry.removeAttribute('aria-activedescendant');
+}
+
+tagEntry.addEventListener('input', () => {
+  if (tagEntry.value.includes(',')) {
+    const parts = tagEntry.value.split(',');
+    parts.slice(0, -1).forEach(addTag);
+    tagEntry.value = parts.at(-1);
+  }
+  renderTagSuggestions();
+});
+tagEntry.addEventListener('focus', renderTagSuggestions);
+tagEntry.addEventListener('blur', () => setTimeout(closeTagSuggestions, 100));
+tagEntry.addEventListener('keydown', (e) => {
+  const open = !tagSuggest.hidden;
+  if (e.key === 'Enter') {
+    e.preventDefault(); // Enter must not submit (and close) the log dialog
+    if (open && tagActive >= 0) addTag(tagOptions[tagActive].value);
+    else addTag(tagEntry.value);
+  } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (!open) return renderTagSuggestions();
+    e.preventDefault();
+    const step = e.key === 'ArrowDown' ? 1 : -1;
+    tagActive = (tagActive + step + tagOptions.length) % tagOptions.length;
+    paintTagSuggestions();
+  } else if (e.key === 'Escape' && open) {
+    e.preventDefault(); // close the list, not the dialog
+    e.stopPropagation();
+    closeTagSuggestions();
+  } else if (e.key === 'Backspace' && !tagEntry.value && tagState.length) {
+    tagState.pop();
+    renderTagChips();
+    renderTagSuggestions();
+  }
+});
+// mousedown (not click) so the input keeps focus while picking.
+tagSuggest.addEventListener('mousedown', (e) => {
+  const li = e.target.closest('[data-tag-index]');
+  if (!li) return;
+  e.preventDefault();
+  addTag(tagOptions[Number(li.dataset.tagIndex)].value);
+});
+tagChips.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-remove-tag]');
+  if (!btn) return;
+  tagState.splice(Number(btn.dataset.removeTag), 1);
+  renderTagChips();
+  tagEntry.focus();
+});
+$('#tag-input').addEventListener('click', (e) => {
+  if (e.target.id === 'tag-input') tagEntry.focus();
+});
+
 // beforeSave lets the preview page add the book to the library only once the log is confirmed.
 function openLogDialog(book, log, beforeSave) {
   logContext = { book, log, beforeSave };
@@ -707,6 +826,8 @@ function openLogDialog(book, log, beforeSave) {
   // New entries reuse the formats from this book's last read, else guess from the edition.
   const formats = log ? log.formats || [] : store.logsFor(book.id || '')[0]?.formats || guessFormats(book);
   logForm.querySelectorAll('[name=formats]').forEach((cb) => (cb.checked = formats.includes(cb.value)));
+  logForm.knitted.checked = !!log?.knitted;
+  setTags(log?.tags || []);
   $('#log-delete').hidden = !log;
   paintStars(log?.rating || 0);
   logDialog.showModal();
@@ -725,6 +846,8 @@ logDialog.addEventListener('close', () => {
     liked: logForm.liked.checked,
     reread: logForm.reread.checked,
     formats: [...logForm.querySelectorAll('[name=formats]:checked')].map((cb) => cb.value),
+    knitted: logForm.knitted.checked,
+    tags: [...tagState, tagEntry.value], // text still in the box counts too
     review: logForm.review.value,
   });
   logContext = null;

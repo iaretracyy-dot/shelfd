@@ -45,7 +45,19 @@
         <label><input type="checkbox" name="formats" value="ebook" /><span>📱 Ebook</span></label>
         <label><input type="checkbox" name="formats" value="audio" /><span>🎧 Audiobook</span></label>
       </fieldset>
-      <label class="check"><input type="checkbox" name="reread" /> I've read this before</label>
+      <div class="check-row">
+        <label class="check"><input type="checkbox" name="reread" /> I've read this before</label>
+        <label class="check"><input type="checkbox" name="knitted" /> 🧶 I knitted while reading</label>
+      </div>
+      <div class="field tag-field">
+        <label for="tag-entry">Tags</label>
+        <div class="tag-input" id="tag-input">
+          <ul class="tag-chips" id="tag-chips" aria-label="Selected tags"></ul>
+          <input id="tag-entry" type="text" placeholder="Add a tag…" autocomplete="off" maxlength="40"
+            role="combobox" aria-expanded="false" aria-controls="tag-suggestions" aria-autocomplete="list" />
+        </div>
+        <ul class="tag-suggestions" id="tag-suggestions" role="listbox" hidden></ul>
+      </div>
       <label class="field">Review <textarea name="review" rows="5" placeholder="Add a review…"></textarea></label>
       <div class="sheet-actions">
         <button type="button" class="btn ghost danger" id="log-delete" hidden>Delete entry</button>

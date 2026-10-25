@@ -79,6 +79,8 @@ export function saveLog(log) {
     liked: !!log.liked,
     reread: !!log.reread,
     formats: Object.keys(FORMATS).filter((f) => (log.formats || []).includes(f)),
+    knitted: !!log.knitted,
+    tags: cleanTags(log.tags),
     review: (log.review || '').trim(),
     createdAt: log.createdAt || new Date().toISOString(),
   };
@@ -88,6 +90,29 @@ export function saveLog(log) {
   if (state.books[entry.bookId]) state.books[entry.bookId].shelf = 'read';
   commit();
   return entry;
+}
+
+export function cleanTags(tags) {
+  const out = [];
+  for (const raw of tags || []) {
+    const tag = String(raw).trim().replace(/\s+/g, ' ').slice(0, 40);
+    if (tag && !out.some((t) => t.toLowerCase() === tag.toLowerCase())) out.push(tag);
+  }
+  return out;
+}
+
+// Every tag used so far, most used first. Tags match case-insensitively.
+export function allTags() {
+  const counts = new Map();
+  for (const l of state.logs) {
+    for (const t of l.tags || []) {
+      const key = t.toLowerCase();
+      const hit = counts.get(key) || { tag: t, n: 0 };
+      hit.n++;
+      counts.set(key, hit);
+    }
+  }
+  return [...counts.values()].sort((a, b) => b.n - a.n || a.tag.localeCompare(b.tag)).map((h) => h.tag);
 }
 
 export function deleteLog(id) {
