@@ -509,32 +509,55 @@ function stats(_, params) {
   const year = params.get('year') || (years.includes(thisYear) ? thisYear : years[0]) || thisYear;
   const month = params.get('month') || 'all'; // '01'..'12' or 'all'
   const picked = logs.filter((l) => (year === 'all' || l.date.startsWith(year)) && (month === 'all' || l.date.slice(5, 7) === month));
+  const period = [month === 'all' ? '' : MONTHS[Number(month) - 1] + (year === 'all' ? ',' : ''), year === 'all' ? (month === 'all' ? 'All time' : 'all years') : year].filter(Boolean).join(' ');
+
+  // Every number on the page is clickable: drill() remembers which diary entries make it up.
+  const drills = [];
+  const drill = (title, entries, opts = {}) => {
+    drills.push({ title, entries, ...opts });
+    return drills.length - 1;
+  };
+  const groupBy = (fn) => Object.entries(picked.reduce((m, l) => (fn(l).forEach((k) => k && (m[k] ||= []).push(l)), m), {})).sort((a, b) => b[1].length - a[1].length);
+  const pagesOf = (l) => Number(books[l.bookId].pages) || 0;
 
   const rated = picked.filter((l) => l.rating);
-  const pages = picked.reduce((n, l) => n + (Number(books[l.bookId].pages) || 0), 0);
-  const dist = Array.from({ length: 10 }, (_, i) => rated.filter((l) => l.rating === (i + 1) / 2).length);
-  const tally = (fn) => Object.entries(picked.reduce((m, l) => (fn(l).forEach((k) => k && (m[k] = (m[k] || 0) + 1)), m), {})).sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const bars = (arr) => `<div class="bars">${arr.map((n) => `<div style="height:${(n / Math.max(1, ...arr)) * 100}%" title="${n}"></div>`).join('')}</div>`;
-  const top = (rows) => (rows.length ? `<ol>${rows.map(([k, n]) => `<li>${esc(k)} <span class="muted">· ${n}</span></li>`).join('')}</ol>` : '<p class="muted">—</p>');
+  const pages = picked.reduce((n, l) => n + pagesOf(l), 0);
+  const liked = picked.filter((l) => l.liked);
 
   // The timeline zooms with the filters: all years -> per year, one year -> per month, one month -> per day.
   let timeline;
   if (month !== 'all') {
     const days = year === 'all' ? 31 : new Date(Number(year), Number(month), 0).getDate();
-    const counts = Array.from({ length: days }, (_, d) => picked.filter((l) => Number(l.date.slice(8, 10)) === d + 1).length);
-    timeline = { title: 'Books per day', counts, labels: ['1', String(Math.ceil(days / 2)), String(days)] };
+    timeline = { title: 'Books per day', ticks: ['1', String(Math.ceil(days / 2)), String(days)],
+      buckets: Array.from({ length: days }, (_, d) => ({ label: `${MONTHS[Number(month) - 1]} ${d + 1}${year === 'all' ? '' : `, ${year}`}`, entries: picked.filter((l) => Number(l.date.slice(8, 10)) === d + 1) })) };
   } else if (year === 'all') {
     const span = years.length ? [...years].reverse() : [thisYear];
-    timeline = { title: 'Books per year', counts: span.map((y) => picked.filter((l) => l.date.startsWith(y)).length), labels: [span[0], '', span[span.length - 1]] };
+    timeline = { title: 'Books per year', ticks: [span[0], '', span[span.length - 1]],
+      buckets: span.map((y) => ({ label: y, entries: picked.filter((l) => l.date.startsWith(y)) })) };
   } else {
-    timeline = { title: 'Books per month', counts: Array.from({ length: 12 }, (_, m) => picked.filter((l) => Number(l.date.slice(5, 7)) === m + 1).length), labels: ['Jan', 'Jun', 'Dec'] };
+    timeline = { title: 'Books per month', ticks: ['Jan', 'Jun', 'Dec'],
+      buckets: MONTHS.map((m, i) => ({ label: `${m} ${year}`, entries: picked.filter((l) => Number(l.date.slice(5, 7)) === i + 1) })) };
   }
+  const ratingBuckets = Array.from({ length: 10 }, (_, i) => ({ label: `Rated ${starsText((i + 1) / 2)}`, entries: rated.filter((l) => l.rating === (i + 1) / 2) }));
 
-  const period = [month === 'all' ? '' : MONTHS[Number(month) - 1] + (year === 'all' ? ',' : ''), year === 'all' ? (month === 'all' ? 'All time' : 'all years') : year].filter(Boolean).join(' ');
   // A read in one format counts toward that format; a read in two or more counts once, as a combination.
-  const formatCounts = Object.keys(store.FORMATS).map((f) => [f, picked.filter((l) => l.formats?.length === 1 && l.formats[0] === f).length]);
-  const combos = tally((l) => (l.formats?.length > 1 ? [l.formats.map((f) => store.FORMATS[f]).join(' + ')] : []));
-  const comboTotal = picked.filter((l) => l.formats?.length > 1).length;
+  const single = Object.keys(store.FORMATS).map((f) => [f, picked.filter((l) => l.formats?.length === 1 && l.formats[0] === f)]);
+  const combined = picked.filter((l) => l.formats?.length > 1);
+  const combos = groupBy((l) => (l.formats?.length > 1 ? [l.formats.map((f) => store.FORMATS[f]).join(' + ')] : []));
+
+  const tile = (value, label, d, extra = '') =>
+    `<button type="button" class="tile drill" data-drill="${d}" ${drills[d].entries.length ? '' : 'disabled'}><b>${value}</b><span class="muted">${label}</span>${extra}</button>`;
+  // Timeline bars name their own period, so their drill-down skips the filter label.
+  const bars = (buckets, chartTitle, ownPeriod = false) => {
+    const max = Math.max(1, ...buckets.map((b) => b.entries.length));
+    return `<div class="bars">${buckets.map((b) => {
+      const n = b.entries.length;
+      return `<button type="button" style="height:${(n / max) * 100}%" data-drill="${drill(b.label, b.entries, { ownPeriod })}" title="${esc(b.label)}: ${n}" aria-label="${esc(chartTitle)}, ${esc(b.label)}: ${n} ${n === 1 ? 'book' : 'books'}" ${n ? '' : 'disabled'}></button>`;
+    }).join('')}</div>`;
+  };
+  const top = (rows, what) => (rows.length
+    ? `<ol>${rows.slice(0, 5).map(([k, entries]) => `<li><button type="button" class="link-btn" data-drill="${drill(`${what}: ${k}`, entries)}">${esc(k)}</button> <span class="muted">· ${entries.length}</span></li>`).join('')}</ol>`
+    : '<p class="muted">—</p>');
 
   app.innerHTML = `
     <h1>Stats</h1>
@@ -552,31 +575,54 @@ function stats(_, params) {
         </select>
       </label>
     </form>
-    <p class="muted">${esc(period)} · ${picked.length} ${picked.length === 1 ? 'book' : 'books'}</p>
+    <p class="muted">${esc(period)} · ${picked.length} ${picked.length === 1 ? 'book' : 'books'}${picked.length ? ' · Click any number or bar to see the books.' : ''}</p>
     ${picked.length ? '' : '<div class="empty">No books logged in this period.</div>'}
     <div class="tile-row">
-      <div class="tile"><b>${picked.length}</b><span class="muted">books</span></div>
-      <div class="tile"><b>${pages.toLocaleString()}</b><span class="muted">pages</span></div>
-      <div class="tile"><b>${rated.length ? (rated.reduce((n, l) => n + l.rating, 0) / rated.length).toFixed(1) : '—'}</b><span class="muted">average rating</span></div>
-      <div class="tile"><b>${picked.filter((l) => l.liked).length}</b><span class="muted">liked</span></div>
+      ${tile(picked.length, 'books', drill('Books', picked))}
+      ${tile(pages.toLocaleString(), 'pages', drill('Pages', [...picked].sort((a, b) => pagesOf(b) - pagesOf(a)), { showPages: true }))}
+      ${tile(rated.length ? (rated.reduce((n, l) => n + l.rating, 0) / rated.length).toFixed(1) : '—', 'average rating', drill('Rated books', [...rated].sort((a, b) => b.rating - a.rating)))}
+      ${tile(liked.length, 'liked', drill('Liked', liked))}
     </div>
     <h2 class="section-title">How you read</h2>
-    <div class="tile-row">${formatCounts.map(([f, n]) => `<div class="tile"><b>${FORMAT_ICONS[f]} ${n}</b><span class="muted">${store.FORMATS[f].toLowerCase()}</span></div>`).join('')}
-      <div class="tile"><b>🔀 ${comboTotal}</b><span class="muted">combination</span>
-        ${combos.map(([k, n]) => `<small class="muted combo-line">${esc(k)} · ${n}</small>`).join('')}</div>
+    <div class="tile-row">
+      ${single.map(([f, entries]) => tile(`${FORMAT_ICONS[f]} ${entries.length}`, store.FORMATS[f].toLowerCase(), drill(store.FORMATS[f], entries))).join('')}
+      ${tile(`🔀 ${combined.length}`, 'combination', drill('Combination', combined),
+        combos.map(([k, entries]) => `<small class="muted combo-line">${esc(k)} · ${entries.length}</small>`).join(''))}
     </div>
-    <h2 class="section-title">${timeline.title}</h2>${bars(timeline.counts)}<div class="bar-labels">${timeline.labels.map((l) => `<span>${esc(l)}</span>`).join('')}</div>
-    <h2 class="section-title">Ratings</h2>${bars(dist)}<div class="bar-labels"><span class="stars">½</span><span class="stars">★★★★★</span></div>
+    <h2 class="section-title">${timeline.title}</h2>${bars(timeline.buckets, timeline.title, true)}<div class="bar-labels">${timeline.ticks.map((l) => `<span>${esc(l)}</span>`).join('')}</div>
+    <h2 class="section-title">Ratings</h2>${bars(ratingBuckets, 'Ratings')}<div class="bar-labels"><span class="stars">½</span><span class="stars">★★★★★</span></div>
     <div class="tile-row" style="margin-top:2rem">
-      <div><h2 class="section-title">Top authors</h2>${top(tally((l) => books[l.bookId].authors || []))}</div>
-      <div><h2 class="section-title">Top publishers</h2>${top(tally((l) => [books[l.bookId].publisher]))}</div>
+      <div><h2 class="section-title">Top authors</h2>${top(groupBy((l) => books[l.bookId].authors || []), 'Author')}</div>
+      <div><h2 class="section-title">Top publishers</h2>${top(groupBy((l) => [books[l.bookId].publisher]), 'Publisher')}</div>
     </div>`;
 
   $('#stats-filters').addEventListener('change', (e) => {
     const f = e.currentTarget;
     location.hash = `#/stats?year=${f.year.value}&month=${f.month.value}`;
   });
+  app.querySelectorAll('[data-drill]').forEach((el) => el.addEventListener('click', () => openDrill(drills[el.dataset.drill], period)));
 }
+
+const drillDialog = $('#drill-dialog');
+function openDrill({ title, entries, showPages, ownPeriod }, period) {
+  const { books } = store.getState();
+  $('#drill-title').textContent = title;
+  $('#drill-sub').textContent = `${ownPeriod ? '' : `${period} · `}${entries.length} ${entries.length === 1 ? 'book' : 'books'}`;
+  $('#drill-list').innerHTML = entries.map((l) => {
+    const b = books[l.bookId];
+    const meta = [new Date(l.date + 'T00:00').toLocaleDateString(undefined, { dateStyle: 'medium' }), showPages ? (b.pages ? `${Number(b.pages).toLocaleString()} pp` : 'pages unknown') : ''].filter(Boolean).join(' · ');
+    return `<li><a class="drill-row" href="#/book/${encodeURIComponent(b.id)}">
+      ${cover(b, 'sm')}
+      <div><h3>${esc(b.title)}</h3><span class="muted">${esc(authorsText(b.authors))}</span><br>
+        <span class="muted">${esc(meta)}</span> <span class="stars">${starsText(l.rating)}</span> ${l.liked ? '<span class="heart">♥</span>' : ''} ${formatIcons(l.formats)}</div>
+    </a></li>`;
+  }).join('');
+  drillDialog.showModal();
+}
+drillDialog.addEventListener('click', (e) => {
+  // Close on a backdrop click or when following a link to a book.
+  if (e.target === drillDialog || e.target.closest('a.drill-row')) drillDialog.close();
+});
 
 // ---------- log dialog ----------
 
