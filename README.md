@@ -17,6 +17,7 @@ Comes in two parts:
 - **Shelves:** Want to read · Reading · Read · Did not finish.
 - **Library:** a cover grid with sorting. **Stats:** books and pages per year, rating spread, top authors and publishers.
 - **Export / import JSON:** both apps use the same file format, so a library can move between the website and the phone.
+- **Import from StoryGraph** (website): load StoryGraph's CSV export, or the same file saved as `.xlsx`. Shelves, read dates (one diary entry per read), ratings, reviews, formats and tags come across. Covers, publishers and page counts are then looked up by ISBN. Re-importing the same file never creates duplicates.
 
 ## Where the book data comes from
 

@@ -1,5 +1,6 @@
 import { initImprints, resolvePublisher } from './imprints.js';
-import { searchCatalog, loadBookDetails, selectEdition, setGoogleKey } from './catalog.js';
+import { searchCatalog, loadBookDetails, selectEdition, setGoogleKey, lookupISBN } from './catalog.js';
+import { readSpreadsheet, parseStoryGraph } from './storygraph.js';
 import * as store from './store.js';
 
 const app = document.getElementById('app');
@@ -56,7 +57,7 @@ function parseHash() {
 
 // ---------- router ----------
 
-const routes = { '': home, search, preview, add: addManually, book: bookPage, diary, library, stats };
+const routes = { '': home, search, preview, add: addManually, import: importPage, book: bookPage, diary, library, stats };
 let currentAbort = null;
 
 function render() {
@@ -391,6 +392,115 @@ function addManually() {
   );
 }
 
+// ---------- StoryGraph import ----------
+
+let enrichJob = null; // background detail lookup: { total, done, found, running }
+
+function importPage() {
+  app.innerHTML = `
+    <h1>Import from StoryGraph</h1>
+    <ol class="steps">
+      <li>On StoryGraph, open <b>Manage Account</b> and choose <b>Export StoryGraph Library</b>.</li>
+      <li>Download the CSV file it gives you.</li>
+      <li>Choose that file below. A copy you opened and saved in Excel (.xlsx) works too.</li>
+    </ol>
+    <label class="dropzone">
+      <input type="file" id="sg-file" accept=".csv,.xlsx,.xls,text/csv" />
+      <span>📄 Choose your StoryGraph file…</span>
+    </label>
+    <div id="sg-result"></div>
+    <div id="enrich-progress"></div>`;
+  paintEnrich();
+  $('#sg-file').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const out = $('#sg-result');
+    out.innerHTML = '<div class="spinner"></div>';
+    try {
+      const parsed = parseStoryGraph(await readSpreadsheet(file));
+      if (!parsed.books.length) throw new Error('No books found in this file.');
+      showImportPreview(parsed, file.name);
+    } catch (err) {
+      out.innerHTML = `<div class="notice">⚠ Couldn't read “${esc(file.name)}”: ${esc(err.message)}</div>`;
+    }
+    e.target.value = '';
+  });
+}
+
+function showImportPreview({ books, skipped }, fileName) {
+  const count = (shelf) => books.filter((b) => b.shelf === shelf).length;
+  const entries = books.reduce((n, b) => n + b.logs.length, 0);
+  const withISBN = books.filter((b) => b.isbn13 || b.isbn10).length;
+  const shelfLine = Object.entries(store.SHELVES).map(([k, label]) => `<li><b>${count(k)}</b> ${label.toLowerCase()}</li>`).join('');
+  $('#sg-result').innerHTML = `
+    <h2 class="section-title">${esc(fileName)}</h2>
+    <p>Found <b>${books.length}</b> books, which will add <b>${entries}</b> diary ${entries === 1 ? 'entry' : 'entries'}.${skipped ? ` <span class="muted">${skipped} ${skipped === 1 ? 'row' : 'rows'} without a title ${skipped === 1 ? 'was' : 'were'} skipped.</span>` : ''}</p>
+    <ul class="import-counts">${shelfLine}</ul>
+    <table class="import-table">
+      <thead><tr><th>Title</th><th>Author</th><th>Shelf</th><th>Reads</th><th>Rating</th></tr></thead>
+      <tbody>${books.slice(0, 8).map((b) => `<tr><td>${esc(b.title)}</td><td>${esc(authorsText(b.authors))}</td><td>${esc(store.SHELVES[b.shelf])}</td><td>${b.logs.length || '—'}</td><td class="stars">${starsText(b.logs.at(-1)?.rating)}</td></tr>`).join('')}</tbody>
+    </table>
+    ${books.length > 8 ? `<p class="muted">…and ${books.length - 8} more.</p>` : ''}
+    <label class="check"><input type="checkbox" id="sg-enrich" ${withISBN ? 'checked' : 'disabled'} />
+      Look up covers, publishers and page counts for the ${withISBN} books with an ISBN (StoryGraph doesn't export them)</label>
+    <p class="muted small-print">Books already in your library are matched and not duplicated, so it's safe to import the same file again later.</p>
+    <button type="button" class="btn primary" id="sg-import">Import ${books.length} books</button>`;
+  $('#sg-import').addEventListener('click', () => {
+    const enrich = $('#sg-enrich').checked;
+    const r = store.importLibrary(books);
+    $('#sg-result').innerHTML = `
+      <div class="import-done">
+        <h2>✓ Import complete</h2>
+        <p>Added <b>${r.added}</b> new ${r.added === 1 ? 'book' : 'books'}${r.matched ? `, matched <b>${r.matched}</b> already in your library` : ''}, and <b>${r.entries}</b> diary ${r.entries === 1 ? 'entry' : 'entries'}.</p>
+        <p><a class="btn small" href="#/library">Go to Library</a> <a class="btn small" href="#/diary">Go to Diary</a> <a class="btn small" href="#/stats">See Stats</a></p>
+      </div>`;
+    toast('Import complete');
+    if (enrich) enrichBooks(r.ids);
+  });
+}
+
+const ENRICH_FIELDS = ['publisher', 'imprint', 'pages', 'publishedDate', 'editionKey', 'workKey', 'language', 'description', 'isbn13', 'isbn10'];
+
+async function enrichBooks(ids) {
+  if (enrichJob?.running) return;
+  const queue = [...new Set(ids)].filter((id) => {
+    const b = store.getBook(id);
+    return b && (b.isbn13 || b.isbn10) && (!b.pages || !b.publisher);
+  });
+  enrichJob = { total: queue.length, done: 0, found: 0, running: true };
+  paintEnrich();
+  const worker = async () => {
+    while (queue.length) {
+      const id = queue.shift();
+      const book = store.getBook(id);
+      try {
+        const info = book && (await lookupISBN(book.isbn13 || book.isbn10));
+        if (info) {
+          const patch = Object.fromEntries(ENRICH_FIELDS.filter((f) => !book[f] && info[f]).map((f) => [f, info[f]]));
+          if (info.coverUrl && !/covers\.openlibrary\.org\/b\/id\//.test(book.coverUrl || '')) patch.coverUrl = info.coverUrl;
+          store.updateBook(id, patch);
+          enrichJob.found++;
+        }
+      } catch {}
+      enrichJob.done++;
+      paintEnrich();
+    }
+  };
+  await Promise.all(Array.from({ length: 4 }, worker)); // a few at a time, to be polite to Open Library
+  enrichJob.running = false;
+  paintEnrich();
+}
+
+function paintEnrich() {
+  const el = $('#enrich-progress');
+  if (!el || !enrichJob || !enrichJob.total) return;
+  const { total, done, found, running } = enrichJob;
+  el.innerHTML = running
+    ? `<p>Looking up book details… <b>${done}</b> of ${total}</p><progress max="${total}" value="${done}"></progress>
+       <p class="muted small-print">You can keep using Shelfd while this runs.</p>`
+    : `<p>✓ Filled in details for <b>${found}</b> of ${total} books.${total - found ? ` ${total - found} couldn't be found in the catalogs; you can add their details from each book's page.` : ''}</p>`;
+}
+
 // ---------- library book page ----------
 
 function bookPage([id]) {
@@ -514,7 +624,7 @@ function library(_, params) {
   books.sort(sorters[sort] || sorters.added);
   const tab = (k, label) => `<a class="btn small" aria-pressed="${shelf === k}" href="#/library?shelf=${k}&sort=${sort}">${label}</a>`;
   app.innerHTML = `
-    <h1>Library</h1>
+    <div class="page-head"><h1>Library</h1><a class="btn small" href="#/import">⇪ Import from StoryGraph</a></div>
     <div class="tabs">${tab('all', 'All')}${Object.entries(store.SHELVES).map(([k, l]) => tab(k, l)).join('')}
       <span class="spacer"></span>
       <select id="sort" aria-label="Sort" style="width:auto">${Object.keys(sorters).map((k) => `<option value="${k}" ${k === sort ? 'selected' : ''}>Sort: ${k}</option>`).join('')}</select>
@@ -898,6 +1008,7 @@ settingsDialog.addEventListener('close', () => {
   store.setSetting('googleKey', key);
   setGoogleKey(key);
 });
+$('#storygraph-link').addEventListener('click', () => settingsDialog.close());
 $('#export-btn').addEventListener('click', () => {
   const blob = new Blob([store.exportJSON()], { type: 'application/json' });
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `shelfd-${today()}.json` });

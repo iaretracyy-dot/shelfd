@@ -115,6 +115,50 @@ export function allTags() {
   return [...counts.values()].sort((a, b) => b.n - a.n || a.tag.localeCompare(b.tag)).map((h) => h.tag);
 }
 
+// Bulk import (StoryGraph). Books already in the library are matched by ISBN,
+// or by title + first author, and only have empty fields filled in. Entries
+// are skipped when that book already has one on the same date, so importing
+// the same file twice changes nothing.
+export function importLibrary(incoming) {
+  const key = (b) => `${String(b.title).toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')}|${String(b.authors?.[0] || '').toLowerCase().replace(/[^\p{L}]/gu, '')}`;
+  const existing = Object.values(state.books);
+  const result = { added: 0, matched: 0, entries: 0, ids: [] };
+  for (const { logs = [], shelf, addedAt, ...book } of incoming) {
+    const isbn = book.isbn13 || book.isbn10;
+    let target = existing.find((b) => (isbn && (b.isbn13 === isbn || b.isbn10 === isbn)) || key(b) === key(book));
+    if (target) {
+      result.matched++;
+      for (const f of BOOK_FIELDS) if (!target[f] && book[f]) target[f] = book[f];
+    } else {
+      const id = isbn ? `isbn:${isbn}` : `sg:${key(book)}`;
+      target = { ...Object.fromEntries(BOOK_FIELDS.map((f) => [f, book[f] ?? ''])), id, shelf, addedAt: addedAt ? `${addedAt}T00:00:00.000Z` : new Date().toISOString() };
+      state.books[id] = target;
+      existing.push(target);
+      result.added++;
+    }
+    result.ids.push(target.id);
+    for (const log of logs) {
+      if (state.logs.some((l) => l.bookId === target.id && l.date === log.date)) continue;
+      state.logs.push({
+        id: `sg:${target.id}:${log.date}`,
+        bookId: target.id,
+        date: log.date,
+        rating: log.rating || 0,
+        liked: false,
+        reread: !!log.reread,
+        formats: log.formats || [],
+        knitted: false,
+        tags: cleanTags(log.tags),
+        review: log.review || '',
+        createdAt: new Date().toISOString(),
+      });
+      result.entries++;
+    }
+  }
+  commit();
+  return result;
+}
+
 export function deleteLog(id) {
   state.logs = state.logs.filter((l) => l.id !== id);
   commit();

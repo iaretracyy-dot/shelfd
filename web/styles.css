@@ -176,6 +176,23 @@ dialog::backdrop { background: rgba(0,0,0,.7); }
 .format-picker label span { display: inline-block; padding: .4rem .8rem; border-radius: 999px; background: var(--surface-2); color: var(--muted); font-weight: 600; font-size: .9rem; border: 1px solid transparent; }
 .format-picker label input:checked + span { background: rgba(64,188,244,.15); color: var(--blue); border-color: var(--blue); }
 .format-picker input:focus-visible + span { outline: 2px solid var(--blue); outline-offset: 2px; }
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.steps { color: var(--muted); padding-left: 1.2rem; }
+.steps li { margin-bottom: .3rem; }
+.steps b { color: var(--text); }
+.dropzone { display: block; border: 2px dashed var(--line); border-radius: 10px; padding: 2rem 1rem; text-align: center; cursor: pointer; margin: 1.25rem 0; font-weight: 600; }
+.dropzone:hover, .dropzone:focus-within { border-color: var(--green); }
+.dropzone input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.import-counts { list-style: none; padding: 0; display: flex; gap: 1.25rem; flex-wrap: wrap; color: var(--muted); }
+.import-counts b { color: var(--text); }
+.import-table { width: 100%; border-collapse: collapse; font-size: .9rem; margin: 1rem 0 .5rem; }
+.import-table th { text-align: left; color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; padding: .4rem .5rem; border-bottom: 1px solid var(--line); }
+.import-table td { padding: .45rem .5rem; border-bottom: 1px solid var(--line); }
+.small-print { font-size: .82rem; }
+.import-done { background: rgba(0,192,48,.08); border: 1px solid rgba(0,192,48,.4); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1rem; }
+.import-done h2 { color: var(--green); }
+progress { width: 100%; height: 10px; accent-color: var(--green); }
+@media (max-width: 720px) { .import-table th:nth-child(4), .import-table td:nth-child(4) { display: none; } }
 .notice { background: rgba(255,128,0,.12); border: 1px solid rgba(255,128,0,.45); color: #ffc58a; border-radius: var(--radius); padding: .6rem .9rem; margin-bottom: 1rem; font-size: .9rem; }
 .notice a { color: #fff; text-decoration: underline; }
 .manual-cta { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 1.5rem; padding: 1rem; border: 1px dashed var(--line); border-radius: var(--radius); color: var(--muted); }

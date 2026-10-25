@@ -149,6 +149,23 @@ export async function selectEdition(edition, { signal } = {}) {
   return fillGaps({ ...edition }, signal);
 }
 
+// Details for one ISBN (used to enrich imported books): Open Library edition,
+// with Google Books filling whatever is missing. Returns null when neither knows it.
+export async function lookupISBN(isbn, { signal } = {}) {
+  const key = isbn.length === 13 ? 'isbn13' : 'isbn10';
+  let book;
+  try {
+    const e = await getJSON(`${OL}/isbn/${encodeURIComponent(isbn)}.json`, signal);
+    book = fromOpenLibraryEdition(e, { workKey: lastKey(e.works?.[0]?.key), title: e.title || '', authors: [], firstPublished: '', description: '', subjects: [] });
+  } catch (err) {
+    if (err.name === 'AbortError') throw err;
+    book = { ...emptyEdition(), [key]: isbn, description: '', coverUrl: '' };
+  }
+  if (!book.isbn13 && !book.isbn10) book[key] = isbn;
+  const filled = await fillGaps(book, signal);
+  return filled.publisher || filled.pages || filled.editionKey ? filled : null;
+}
+
 function emptyEdition() {
   return { editionKey: '', publisher: '', imprint: '', publishers: [], pages: null, isbn13: '', isbn10: '', publishedDate: '', language: '', format: '' };
 }
