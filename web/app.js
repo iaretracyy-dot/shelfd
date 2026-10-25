@@ -460,8 +460,8 @@ function logItem(l) {
     <div><b>${new Date(l.date + 'T00:00').toLocaleDateString(undefined, { dateStyle: 'medium' })}</b>
       <span class="stars">${starsText(l.rating)}</span> ${l.liked ? '<span class="heart">♥</span>' : ''} ${l.reread ? '<span class="muted" title="Reread">↻</span>' : ''} ${formatIcons(l.formats)} ${knitIcon(l)}
       <button type="button" class="btn small ghost" data-log="${esc(l.id)}">Edit</button></div>
-    ${l.tags?.length ? `<div class="log-tags">${tagList(l.tags)}</div>` : ''}
     ${l.review ? `<p>${esc(l.review)}</p>` : ''}
+    ${l.tags?.length ? `<div class="log-tags">${tagList(l.tags)}</div>` : ''}
   </li>`;
 }
 
