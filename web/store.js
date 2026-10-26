@@ -15,12 +15,25 @@ function load() {
   return { version: 1, books: {}, logs: [], settings: {} };
 }
 
+// Several tabs can have Shelfd open at once. Every change first re-reads the
+// saved library (sync) and then writes it back, so one tab never overwrites
+// what another tab saved. Other tabs hear about it through the storage event.
+function sync() {
+  state = load();
+}
+
 function commit() {
   try {
     localStorage.setItem(KEY, JSON.stringify(state));
   } catch {}
-  listeners.forEach((fn) => fn(state));
+  listeners.forEach((fn) => fn(state, { external: false }));
 }
+
+window.addEventListener('storage', (e) => {
+  if (e.key !== KEY && e.key !== null) return;
+  sync();
+  listeners.forEach((fn) => fn(state, { external: true }));
+});
 
 export const subscribe = (fn) => listeners.add(fn);
 export const getState = () => state;
@@ -49,6 +62,7 @@ export function findInLibrary(book) {
 const BOOK_FIELDS = ['source', 'workKey', 'editionKey', 'googleId', 'title', 'subtitle', 'authors', 'publisher', 'imprint', 'pages', 'isbn13', 'isbn10', 'publishedDate', 'firstPublished', 'language', 'format', 'description', 'subjects', 'coverUrl'];
 
 export function saveBook(book, patch = {}) {
+  sync();
   const id = book.id || bookId(book);
   const existing = state.books[id];
   const data = Object.fromEntries(BOOK_FIELDS.map((f) => [f, book[f] ?? existing?.[f] ?? '']));
@@ -58,18 +72,21 @@ export function saveBook(book, patch = {}) {
 }
 
 export function updateBook(id, patch) {
+  sync();
   if (!state.books[id]) return;
   state.books[id] = { ...state.books[id], ...patch };
   commit();
 }
 
 export function removeBook(id) {
+  sync();
   delete state.books[id];
   state.logs = state.logs.filter((l) => l.bookId !== id);
   commit();
 }
 
 export function saveLog(log) {
+  sync();
   const entry = {
     id: log.id || crypto.randomUUID(),
     bookId: log.bookId,
@@ -119,6 +136,7 @@ export function allTags() {
 // are skipped when that book already has one on the same date, so importing
 // the same file twice changes nothing.
 export function importLibrary(incoming) {
+  sync();
   const key = (b) => `${String(b.title).toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')}|${String(b.authors?.[0] || '').toLowerCase().replace(/[^\p{L}]/gu, '')}`;
   const existing = Object.values(state.books);
   const result = { added: 0, matched: 0, entries: 0, ids: [] };
@@ -164,6 +182,7 @@ export function importLibrary(incoming) {
 //             reads get a new diary entry on it
 //   formats - replaces the formats on each book's most recent read
 export function bulkUpdate(ids, { shelf, date, formats }) {
+  sync();
   const r = { books: 0, redated: 0, created: 0, formatted: 0, noRead: 0 };
   const cleanFormats = formats && Object.keys(FORMATS).filter((f) => formats.includes(f));
   for (const id of ids) {
@@ -204,6 +223,7 @@ export function restore(saved) {
 }
 
 export function deleteLog(id) {
+  sync();
   state.logs = state.logs.filter((l) => l.id !== id);
   commit();
 }
@@ -213,6 +233,7 @@ export function latestRating(bookId) {
 }
 
 export function setSetting(key, value) {
+  sync();
   state.settings = { ...state.settings, [key]: value };
   commit();
 }
@@ -223,6 +244,7 @@ export function exportJSON() {
 }
 
 export function importJSON(text) {
+  sync();
   const data = JSON.parse(text);
   if (!data || typeof data.books !== 'object' || !Array.isArray(data.logs)) throw new Error('Not a Shelfd export file.');
   const ids = new Set(state.logs.map((l) => l.id));

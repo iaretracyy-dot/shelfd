@@ -70,7 +70,8 @@ function parseHash() {
 const routes = { '': home, search, preview, add: addManually, import: importPage, book: bookPage, diary, library, stats };
 let currentAbort = null;
 
-function render() {
+function render({ keepScroll = false } = {}) {
+  const y = window.scrollY;
   currentAbort?.abort();
   currentAbort = new AbortController();
   const { parts, params } = parseHash();
@@ -78,7 +79,7 @@ function render() {
   if (parts[0] !== 'library') selection = null;
   document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === (parts[0] || 'home')));
   view(parts.slice(1), params, currentAbort.signal);
-  window.scrollTo(0, 0);
+  window.scrollTo(0, keepScroll ? y : 0);
 }
 
 // ---------- home ----------
@@ -516,15 +517,17 @@ function paintEnrich() {
 // ---------- library book page ----------
 
 function bookPage([id]) {
-  const book = store.getBook(id);
+  let book = store.getBook(id);
   if (!book) {
     app.innerHTML = `<div class="empty">This book isn't in your library.</div>`;
     return;
   }
-  const logs = store.logsFor(id);
+  let logs;
   let editing = false;
 
   const draw = () => {
+    book = store.getBook(id) || book; // latest saved copy (another tab may have changed it)
+    logs = store.logsFor(id);
     app.innerHTML = `
       <form class="book" id="book-form">
         <div>${cover(book, 'lg')}
@@ -551,8 +554,9 @@ function bookPage([id]) {
     form.querySelector('[data-act="log"]').addEventListener('click', () => openLogDialog(book, null));
     form.querySelector('[data-act="edit"]').addEventListener('click', () => {
       if (editing) {
-        Object.assign(book, readEdits(form, book));
-        store.updateBook(id, book);
+        // Save only the detail fields, so nothing else on the book is overwritten.
+        const edits = readEdits(form, book);
+        store.updateBook(id, Object.fromEntries(DETAIL_FIELDS.map(([key]) => [key, edits[key]])));
         toast('Details saved');
       }
       editing = !editing;
@@ -560,8 +564,7 @@ function bookPage([id]) {
     });
     form.querySelectorAll('[data-shelf]').forEach((btn) =>
       btn.addEventListener('click', () => {
-        book.shelf = btn.dataset.shelf;
-        store.updateBook(id, { shelf: book.shelf });
+        store.updateBook(id, { shelf: btn.dataset.shelf });
         draw();
       }),
     );
@@ -1162,7 +1165,24 @@ $('#quick-search').addEventListener('submit', (e) => {
   const q = e.target.q.value.trim();
   if (q) location.hash = `#/search?q=${encodeURIComponent(q)}`;
 });
-window.addEventListener('hashchange', render);
+window.addEventListener('hashchange', () => render());
+
+// Another tab saved a change. The store has already re-read it; refresh the
+// page on screen, unless the user is in the middle of editing something here.
+let staleView = false;
+const isEditing = () => !!document.querySelector('dialog[open]') || !!app.querySelector('.details input, #manual-form, #sg-import');
+function refreshIfStale() {
+  if (!staleView || isEditing()) return;
+  staleView = false;
+  render({ keepScroll: true });
+}
+store.subscribe((_, { external }) => {
+  if (!external) return;
+  staleView = true;
+  refreshIfStale();
+});
+document.addEventListener('visibilitychange', () => !document.hidden && refreshIfStale());
+document.querySelectorAll('dialog').forEach((d) => d.addEventListener('close', () => setTimeout(refreshIfStale)));
 setGoogleKey(store.getState().settings.googleKey);
 await initImprints();
 render();
