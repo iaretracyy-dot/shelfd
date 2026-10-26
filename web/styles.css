@@ -120,9 +120,12 @@ main { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; outline:
 
 /* rows / grids */
 .poster-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 1rem; }
-.poster { display: grid; gap: .3rem; font-size: .8rem; }
+.poster { display: grid; gap: .3rem; font-size: .8rem; align-content: start; }
 .poster .cover { width: 100%; }
 .poster:hover .cover { box-shadow: 0 0 0 2px var(--green); }
+.poster-title { font-family: Georgia, serif; font-weight: 700; font-size: .85rem; line-height: 1.25; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: .15rem; }
+.poster-author { color: var(--muted); font-size: .75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: -.2rem; }
+.poster:hover .poster-title { color: var(--blue); }
 .poster .under { display: flex; gap: .4rem; color: var(--muted); }
 .diary-month { margin-top: 1.5rem; }
 .diary-row { display: grid; grid-template-columns: 3rem 46px 1fr auto auto; gap: 1rem; align-items: center; padding: .5rem 0; border-bottom: 1px solid var(--line); }

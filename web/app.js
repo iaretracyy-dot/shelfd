@@ -114,13 +114,14 @@ function home() {
   });
 }
 
-function posterGrid(books) {
+function posterGrid(books, { titles = false } = {}) {
   return `<div class="poster-row">${books
     .map((b) => {
       const rating = b.log ? b.log.rating : store.latestRating(b.id);
       const liked = b.log ? b.log.liked : false;
       return `<a class="poster" data-id="${esc(b.id)}" href="#/book/${encodeURIComponent(b.id)}" title="${esc(b.title)} — ${esc(authorsText(b.authors))}">
         ${cover(b)}
+        ${titles ? `<span class="poster-title">${esc(b.title)}</span><span class="poster-author">${esc(authorsText(b.authors))}</span>` : ''}
         <span class="under"><span class="stars">${starsText(rating)}</span>${liked ? '<span class="heart">♥</span>' : ''}</span>
       </a>`;
     })
@@ -646,7 +647,7 @@ function library(_, params) {
       <select id="sort" aria-label="Sort" style="width:auto">${Object.keys(sorters).map((k) => `<option value="${k}" ${k === sort ? 'selected' : ''}>Sort: ${k}</option>`).join('')}</select>
     </div>
     ${selection ? `<p class="muted select-hint">Click books to select them, then choose <b>Edit selected</b>.</p>` : ''}
-    <div class="${selection ? 'selecting' : ''}" id="library-grid">${books.length ? posterGrid(books) : '<div class="empty">No books on this shelf yet.</div>'}</div>
+    <div class="${selection ? 'selecting' : ''}" id="library-grid">${books.length ? posterGrid(books, { titles: true }) : '<div class="empty">No books on this shelf yet.</div>'}</div>
     ${selection ? `<div class="bulk-bar" role="region" aria-label="Bulk actions">
       <span id="bulk-count"></span>
       <button type="button" class="btn small ghost" id="select-all">Select all ${books.length}</button>
