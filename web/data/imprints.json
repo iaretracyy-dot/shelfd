@@ -1,5 +1,5 @@
 {
-  "_comment": "Imprint -> parent publisher. Catalogs usually list the imprint printed on the book; this map fills in the parent house. Shared by the web and iOS apps.",
+  "_comment": "Imprint -> parent publisher. Catalogs usually list the imprint printed on the book; this map fills in the parent house.",
   "Penguin Random House": [
     "Penguin", "Penguin Books", "Penguin Classics", "Penguin Press", "Viking", "Viking Press", "Riverhead", "Riverhead Books",
     "Putnam", "G. P. Putnam's Sons", "Berkley", "Dutton", "Plume", "Ace", "DAW", "Portfolio", "Puffin", "Razorbill",

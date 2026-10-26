@@ -1,5 +1,4 @@
-// Local persistence. The JSON shape here is also what the iOS app exports and
-// imports, so a library can move between the two.
+// Local persistence in the browser. Export / import uses this same JSON shape.
 
 const KEY = 'shelfd.v1';
 export const SHELVES = { want: 'Want to read', reading: 'Reading', read: 'Read', dnf: 'Did not finish' };
