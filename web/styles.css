@@ -55,6 +55,7 @@ main { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; outline:
 /* buttons */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: .4em; border: 0; border-radius: var(--radius); padding: .5rem .9rem; font: inherit; font-weight: 600; background: var(--surface-2); color: var(--text); cursor: pointer; }
 .btn:hover { filter: brightness(1.15); color: var(--text); }
+.btn:disabled { opacity: .45; cursor: default; filter: none; }
 .btn.primary { background: var(--green); color: #fff; }
 .btn.ghost { background: transparent; color: var(--muted); }
 .btn.danger { color: #ff6b6b; }
@@ -193,6 +194,23 @@ dialog::backdrop { background: rgba(0,0,0,.7); }
 .import-done h2 { color: var(--green); }
 progress { width: 100%; height: 10px; accent-color: var(--green); }
 @media (max-width: 720px) { .import-table th:nth-child(4), .import-table td:nth-child(4) { display: none; } }
+.head-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.select-hint { margin-top: -.5rem; }
+.selecting .poster { position: relative; cursor: pointer; }
+.selecting .poster::after { content: ""; position: absolute; top: 6px; left: 6px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff; background: rgba(0,0,0,.45); box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+.selecting .poster.selected::after { content: "✓"; background: var(--green); border-color: var(--green); color: #fff; font: 700 14px/18px system-ui, sans-serif; text-align: center; }
+.selecting .poster.selected .cover { box-shadow: 0 0 0 3px var(--green); }
+.selecting .poster:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.bulk-bar { position: sticky; bottom: 1rem; margin-top: 1.5rem; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: .6rem .8rem; box-shadow: 0 8px 24px rgba(0,0,0,.45); z-index: 4; }
+.bulk-bar #bulk-count { font-weight: 700; }
+.bulk-section { border: 1px solid var(--line); border-radius: var(--radius); padding: .75rem .9rem; margin: 0 0 .75rem; display: grid; gap: .5rem; }
+.bulk-section .check { margin: 0; color: var(--text); }
+.bulk-section select, .bulk-section input[type=date] { background: var(--surface-2); color: var(--text); border: 1px solid transparent; border-radius: var(--radius); padding: .45rem .7rem; font: inherit; }
+.bulk-section .format-picker { margin: 0; }
+.bulk-section .hint { margin: 0; font-size: .8rem; }
+.bulk-error { color: #ff6b6b; margin: 0; }
+#toast.has-action { pointer-events: auto; display: flex; align-items: center; gap: .75rem; }
+#toast button { background: rgba(0,0,0,.25); color: #fff; border: 0; border-radius: 999px; padding: .2rem .7rem; font: inherit; font-weight: 700; cursor: pointer; }
 .notice { background: rgba(255,128,0,.12); border: 1px solid rgba(255,128,0,.45); color: #ffc58a; border-radius: var(--radius); padding: .6rem .9rem; margin-bottom: 1rem; font-size: .9rem; }
 .notice a { color: #fff; text-decoration: underline; }
 .manual-cta { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 1.5rem; padding: 1rem; border: 1px dashed var(--line); border-radius: var(--radius); color: var(--muted); }

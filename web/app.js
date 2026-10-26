@@ -42,12 +42,22 @@ function cover(book, size = '') {
   return `<div class="${cls}">${esc(book.title)}</div>`;
 }
 
-function toast(msg) {
+// toast('Saved') or toast('Updated', { label: 'Undo', run: fn }) for an action button.
+function toast(msg, action) {
   const t = $('#toast');
   t.textContent = msg;
+  t.classList.toggle('has-action', !!action);
+  if (action) {
+    const btn = Object.assign(document.createElement('button'), { type: 'button', textContent: action.label });
+    btn.addEventListener('click', () => {
+      t.classList.remove('show');
+      action.run();
+    });
+    t.append(' ', btn);
+  }
   t.classList.add('show');
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => t.classList.remove('show'), 2200);
+  toast.timer = setTimeout(() => t.classList.remove('show'), action ? 8000 : 2200);
 }
 
 function parseHash() {
@@ -65,6 +75,7 @@ function render() {
   currentAbort = new AbortController();
   const { parts, params } = parseHash();
   const view = routes[parts[0] || ''] || home;
+  if (parts[0] !== 'library') selection = null;
   document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === (parts[0] || 'home')));
   view(parts.slice(1), params, currentAbort.signal);
   window.scrollTo(0, 0);
@@ -108,7 +119,7 @@ function posterGrid(books) {
     .map((b) => {
       const rating = b.log ? b.log.rating : store.latestRating(b.id);
       const liked = b.log ? b.log.liked : false;
-      return `<a class="poster" href="#/book/${encodeURIComponent(b.id)}" title="${esc(b.title)} — ${esc(authorsText(b.authors))}">
+      return `<a class="poster" data-id="${esc(b.id)}" href="#/book/${encodeURIComponent(b.id)}" title="${esc(b.title)} — ${esc(authorsText(b.authors))}">
         ${cover(b)}
         <span class="under"><span class="stars">${starsText(rating)}</span>${liked ? '<span class="heart">♥</span>' : ''}</span>
       </a>`;
@@ -624,14 +635,122 @@ function library(_, params) {
   books.sort(sorters[sort] || sorters.added);
   const tab = (k, label) => `<a class="btn small" aria-pressed="${shelf === k}" href="#/library?shelf=${k}&sort=${sort}">${label}</a>`;
   app.innerHTML = `
-    <div class="page-head"><h1>Library</h1><a class="btn small" href="#/import">⇪ Import from StoryGraph</a></div>
+    <div class="page-head"><h1>Library</h1>
+      <div class="head-actions">
+        <button type="button" class="btn small" id="select-toggle" aria-pressed="${!!selection}">${selection ? 'Done selecting' : '☑ Select'}</button>
+        <a class="btn small" href="#/import">⇪ Import from StoryGraph</a>
+      </div>
+    </div>
     <div class="tabs">${tab('all', 'All')}${Object.entries(store.SHELVES).map(([k, l]) => tab(k, l)).join('')}
       <span class="spacer"></span>
       <select id="sort" aria-label="Sort" style="width:auto">${Object.keys(sorters).map((k) => `<option value="${k}" ${k === sort ? 'selected' : ''}>Sort: ${k}</option>`).join('')}</select>
     </div>
-    ${books.length ? posterGrid(books) : '<div class="empty">No books on this shelf yet.</div>'}`;
+    ${selection ? `<p class="muted select-hint">Click books to select them, then choose <b>Edit selected</b>.</p>` : ''}
+    <div class="${selection ? 'selecting' : ''}" id="library-grid">${books.length ? posterGrid(books) : '<div class="empty">No books on this shelf yet.</div>'}</div>
+    ${selection ? `<div class="bulk-bar" role="region" aria-label="Bulk actions">
+      <span id="bulk-count"></span>
+      <button type="button" class="btn small ghost" id="select-all">Select all ${books.length}</button>
+      <button type="button" class="btn small ghost" id="select-none">Clear</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn small primary" id="bulk-edit">Edit selected…</button>
+    </div>` : ''}`;
   $('#sort').addEventListener('change', (e) => (location.hash = `#/library?shelf=${shelf}&sort=${e.target.value}`));
+  $('#select-toggle').addEventListener('click', () => {
+    selection = selection ? null : new Set();
+    library(_, params);
+  });
+  if (!selection) return;
+
+  const paintSelection = () => {
+    app.querySelectorAll('.poster').forEach((p) => {
+      const on = selection.has(p.dataset.id);
+      p.classList.toggle('selected', on);
+      p.setAttribute('aria-pressed', on);
+    });
+    $('#bulk-count').textContent = `${selection.size} selected`;
+    $('#bulk-edit').disabled = !selection.size;
+  };
+  app.querySelectorAll('.poster').forEach((p) => p.setAttribute('role', 'button'));
+  $('#library-grid').addEventListener('click', (e) => {
+    const poster = e.target.closest('.poster');
+    if (!poster) return;
+    e.preventDefault(); // in select mode a click selects instead of opening the book
+    const id = poster.dataset.id;
+    selection.has(id) ? selection.delete(id) : selection.add(id);
+    paintSelection();
+  });
+  $('#select-all').addEventListener('click', () => {
+    books.forEach((b) => selection.add(b.id));
+    paintSelection();
+  });
+  $('#select-none').addEventListener('click', () => {
+    selection.clear();
+    paintSelection();
+  });
+  $('#bulk-edit').addEventListener('click', () => openBulkDialog(() => library(_, params)));
+  paintSelection();
 }
+
+// ---------- library bulk edit ----------
+
+let selection = null; // Set of selected book ids while the Library is in select mode
+const bulkDialog = $('#bulk-dialog');
+const bulkForm = $('#bulk-form');
+let afterBulk = null;
+
+bulkForm.shelf.innerHTML = Object.entries(store.SHELVES).map(([k, l]) => `<option value="${k}">${l}</option>`).join('');
+// Touching a section's controls ticks that section.
+for (const [box, controls] of [['doShelf', '[name=shelf]'], ['doDate', '[name=date]'], ['doFormats', '[name=bulkFormats]']]) {
+  bulkForm.querySelectorAll(controls).forEach((el) => el.addEventListener('input', () => (bulkForm[box].checked = true)));
+}
+
+bulkForm.addEventListener('input', () => ($('#bulk-error').hidden = true));
+
+function openBulkDialog(onDone) {
+  afterBulk = onDone;
+  bulkForm.reset();
+  bulkForm.date.value = today();
+  $('#bulk-error').hidden = true;
+  $('#bulk-error').textContent = 'Tick at least one thing to change.';
+  $('#bulk-title').textContent = `Edit ${selection.size} ${selection.size === 1 ? 'book' : 'books'}`;
+  bulkDialog.showModal();
+}
+
+$('#bulk-apply').addEventListener('click', (e) => {
+  const f = bulkForm;
+  const changes = {
+    shelf: f.doShelf.checked ? f.shelf.value : null,
+    date: f.doDate.checked ? f.date.value : null,
+    formats: f.doFormats.checked ? [...f.querySelectorAll('[name=bulkFormats]:checked')].map((c) => c.value) : null,
+  };
+  if (!changes.shelf && !changes.date && !changes.formats) {
+    e.preventDefault();
+    $('#bulk-error').hidden = false;
+    return;
+  }
+  if (f.doDate.checked && !f.date.value) {
+    e.preventDefault();
+    $('#bulk-error').textContent = 'Pick a read date, or untick Read date.';
+    $('#bulk-error').hidden = false;
+    return;
+  }
+  const before = store.snapshot();
+  const r = store.bulkUpdate([...selection], changes);
+  const notes = [
+    r.created && `${r.created} new diary ${r.created === 1 ? 'entry' : 'entries'}`,
+    r.noRead && `${r.noRead} not logged yet, so no format set`,
+  ].filter(Boolean);
+  selection = new Set();
+  afterBulk?.();
+  toast(`Updated ${r.books} ${r.books === 1 ? 'book' : 'books'}${notes.length ? ` (${notes.join('; ')})` : ''}`, {
+    label: 'Undo',
+    run: () => {
+      store.restore(before);
+      render();
+      toast('Changes undone');
+    },
+  });
+});
 
 // ---------- stats ----------
 

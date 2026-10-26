@@ -158,6 +158,51 @@ export function importLibrary(incoming) {
   return result;
 }
 
+// Library bulk edit. Each change is optional:
+//   shelf   - new status for every book
+//   date    - moves each book's most recent read to this date; books with no
+//             reads get a new diary entry on it
+//   formats - replaces the formats on each book's most recent read
+export function bulkUpdate(ids, { shelf, date, formats }) {
+  const r = { books: 0, redated: 0, created: 0, formatted: 0, noRead: 0 };
+  const cleanFormats = formats && Object.keys(FORMATS).filter((f) => formats.includes(f));
+  for (const id of ids) {
+    const book = state.books[id];
+    if (!book) continue;
+    r.books++;
+    let latest = logsFor(id)[0];
+    if (date) {
+      if (latest) {
+        latest.date = date;
+        r.redated++;
+      } else {
+        latest = { id: crypto.randomUUID(), bookId: id, date, rating: 0, liked: false, reread: false, formats: [], knitted: false, tags: [], review: '', createdAt: new Date().toISOString() };
+        state.logs.push(latest);
+        book.shelf = 'read';
+        r.created++;
+      }
+    }
+    if (cleanFormats) {
+      if (latest) {
+        latest.formats = cleanFormats;
+        r.formatted++;
+      } else r.noRead++;
+    }
+    if (shelf) book.shelf = shelf;
+  }
+  commit();
+  return r;
+}
+
+// Whole-library snapshot for undo.
+export const snapshot = () => JSON.stringify({ books: state.books, logs: state.logs });
+export function restore(saved) {
+  const { books, logs } = JSON.parse(saved);
+  state.books = books;
+  state.logs = logs;
+  commit();
+}
+
 export function deleteLog(id) {
   state.logs = state.logs.filter((l) => l.id !== id);
   commit();

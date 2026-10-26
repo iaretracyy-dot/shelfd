@@ -78,6 +78,37 @@
     <ul class="drill-list" id="drill-list"></ul>
   </dialog>
 
+  <dialog id="bulk-dialog" class="sheet">
+    <form method="dialog" id="bulk-form">
+      <h2 id="bulk-title">Edit books</h2>
+      <p class="muted">Tick what you want to change. Everything else stays as it is.</p>
+      <fieldset class="bulk-section">
+        <label class="check"><input type="checkbox" name="doShelf" /> <b>Status</b></label>
+        <select name="shelf" aria-label="New status"></select>
+      </fieldset>
+      <fieldset class="bulk-section">
+        <label class="check"><input type="checkbox" name="doDate" /> <b>Read date</b></label>
+        <input type="date" name="date" aria-label="New read date" />
+        <p class="hint muted">Changes the date of each book's most recent read. Books that haven't been logged yet get a new diary entry on this date and move to Read.</p>
+      </fieldset>
+      <fieldset class="bulk-section">
+        <label class="check"><input type="checkbox" name="doFormats" /> <b>Format</b></label>
+        <div class="format-picker">
+          <label><input type="checkbox" name="bulkFormats" value="physical" /><span>📖 Physical</span></label>
+          <label><input type="checkbox" name="bulkFormats" value="ebook" /><span>📱 Ebook</span></label>
+          <label><input type="checkbox" name="bulkFormats" value="audio" /><span>🎧 Audiobook</span></label>
+        </div>
+        <p class="hint muted">Replaces the formats on each book's most recent read.</p>
+      </fieldset>
+      <p class="bulk-error" id="bulk-error" role="alert" hidden>Tick at least one thing to change.</p>
+      <div class="sheet-actions">
+        <span class="spacer"></span>
+        <button value="cancel" class="btn ghost" formnovalidate>Cancel</button>
+        <button value="apply" class="btn primary" id="bulk-apply">Apply</button>
+      </div>
+    </form>
+  </dialog>
+
   <dialog id="settings-dialog" class="sheet">
     <form method="dialog">
       <h2>Settings</h2>
