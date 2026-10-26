@@ -10,7 +10,7 @@ The site lives in **`web/`**. It's plain HTML/CSS/JS with no build step.
 - **Autofill on select:** author, publisher, imprint, page count, publish date, ISBN-10/13, format, cover and description.
 - **Edition picker:** a book can have many editions. Pick the copy you actually read to get the right publisher and page count.
 - **Correct details**, or **add a book manually** when it isn't in any catalog yet.
-- **Diary:** log every read with a date, ★ to ★★★★★ in half steps, a ♥ like, a reread flag, formats (physical / ebook / audiobook), 🧶 knitted while reading, tags and a review.
+- **Diary:** log every read with a date, ★ to ★★★★★ in half steps, a ♥ like, a reread flag, formats (physical / ebook / audiobook), 🧶 knitted while reading, tags and a review. **Bulk edit** selected entries' read date, format and their books' status, with Undo.
 - **Shelves:** Want to read · Reading · Read · Did not finish.
 - **Library:** a cover grid with sorting, plus **bulk edit**: select books (or a whole shelf) and change status, read date and/or format in one go, with Undo.
 - **Stats:** filter by year and month. See books, pages, ratings, formats (with combinations counted separately), knitting, tags, books per period, rating spread, top authors and top publishers. Click any number or bar to see the books behind it.

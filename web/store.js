@@ -213,6 +213,27 @@ export function bulkUpdate(ids, { shelf, date, formats }) {
   return r;
 }
 
+// Diary bulk edit: the same optional changes, applied to individual entries.
+//   date / formats - set on every selected entry
+//   shelf          - moves the books those entries belong to
+export function bulkUpdateLogs(logIds, { shelf, date, formats }) {
+  sync();
+  const wanted = new Set(logIds);
+  const cleanFormats = formats && Object.keys(FORMATS).filter((f) => formats.includes(f));
+  const bookIds = new Set();
+  let entries = 0;
+  for (const log of state.logs) {
+    if (!wanted.has(log.id)) continue;
+    entries++;
+    bookIds.add(log.bookId);
+    if (date) log.date = date;
+    if (cleanFormats) log.formats = cleanFormats;
+  }
+  if (shelf) for (const id of bookIds) if (state.books[id]) state.books[id].shelf = shelf;
+  commit();
+  return { entries, books: bookIds.size };
+}
+
 // Whole-library snapshot for undo.
 export const snapshot = () => JSON.stringify({ books: state.books, logs: state.logs });
 export function restore(saved) {

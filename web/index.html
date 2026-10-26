@@ -85,11 +85,12 @@
       <fieldset class="bulk-section">
         <label class="check"><input type="checkbox" name="doShelf" /> <b>Status</b></label>
         <select name="shelf" aria-label="New status"></select>
+        <p class="hint muted" id="bulk-hint-shelf"></p>
       </fieldset>
       <fieldset class="bulk-section">
         <label class="check"><input type="checkbox" name="doDate" /> <b>Read date</b></label>
         <input type="date" name="date" aria-label="New read date" />
-        <p class="hint muted">Changes the date of each book's most recent read. Books that haven't been logged yet get a new diary entry on this date and move to Read.</p>
+        <p class="hint muted" id="bulk-hint-date"></p>
       </fieldset>
       <fieldset class="bulk-section">
         <label class="check"><input type="checkbox" name="doFormats" /> <b>Format</b></label>
@@ -98,7 +99,7 @@
           <label><input type="checkbox" name="bulkFormats" value="ebook" /><span>📱 Ebook</span></label>
           <label><input type="checkbox" name="bulkFormats" value="audio" /><span>🎧 Audiobook</span></label>
         </div>
-        <p class="hint muted">Replaces the formats on each book's most recent read.</p>
+        <p class="hint muted" id="bulk-hint-formats"></p>
       </fieldset>
       <p class="bulk-error" id="bulk-error" role="alert" hidden>Tick at least one thing to change.</p>
       <div class="sheet-actions">

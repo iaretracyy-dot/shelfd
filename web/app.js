@@ -76,7 +76,8 @@ function render({ keepScroll = false } = {}) {
   currentAbort = new AbortController();
   const { parts, params } = parseHash();
   const view = routes[parts[0] || ''] || home;
-  if (parts[0] !== 'library') selection = null;
+  if (parts[0] !== selectionPage) selection = null; // selections belong to one page
+  selectionPage = parts[0];
   document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === (parts[0] || 'home')));
   view(parts.slice(1), params, currentAbort.signal);
   window.scrollTo(0, keepScroll ? y : 0);
@@ -605,13 +606,15 @@ function diary() {
     if (!months.has(key)) months.set(key, []);
     months.get(key).push(l);
   }
-  app.innerHTML = `<h1>Diary</h1>${[...months]
+  app.innerHTML = `<div class="page-head"><h1>Diary</h1><div class="head-actions">${selectToggle()}</div></div>
+    ${selection ? `<p class="muted select-hint">Click entries to select them, then choose <b>Edit selected</b>.</p>` : ''}
+    <div class="${selection ? 'selecting' : ''}" id="diary-list">${[...months]
     .map(([month, entries]) => `
       <section class="diary-month">
         <h2 class="section-title">${new Date(month + '-01T00:00').toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</h2>
         ${entries.map((l) => {
           const b = books[l.bookId];
-          return `<a class="diary-row" href="#/book/${encodeURIComponent(b.id)}">
+          return `<a class="diary-row" data-id="${esc(l.id)}" href="#/book/${encodeURIComponent(b.id)}">
             <span class="diary-day">${Number(l.date.slice(8, 10))}</span>
             ${cover(b, 'sm')}
             <div><h3>${esc(b.title)}</h3><span class="muted">${esc(authorsText(b.authors))}${b.pages ? ` · ${b.pages} pp` : ''}</span>${l.tags?.length ? `<div class="log-tags">${tagList(l.tags)}</div>` : ''}</div>
@@ -620,7 +623,9 @@ function diary() {
           </a>`;
         }).join('')}
       </section>`)
-    .join('')}`;
+    .join('')}</div>
+    ${bulkBar(logs.length)}`;
+  wireSelection({ container: $('#diary-list'), items: '.diary-row', allIds: logs.map((l) => l.id), mode: 'entries', rerender: diary });
 }
 
 // ---------- library ----------
@@ -641,7 +646,7 @@ function library(_, params) {
   app.innerHTML = `
     <div class="page-head"><h1>Library</h1>
       <div class="head-actions">
-        <button type="button" class="btn small" id="select-toggle" aria-pressed="${!!selection}">${selection ? 'Done selecting' : '☑ Select'}</button>
+        ${selectToggle()}
         <a class="btn small" href="#/import">⇪ Import from StoryGraph</a>
       </div>
     </div>
@@ -651,56 +656,84 @@ function library(_, params) {
     </div>
     ${selection ? `<p class="muted select-hint">Click books to select them, then choose <b>Edit selected</b>.</p>` : ''}
     <div class="${selection ? 'selecting' : ''}" id="library-grid">${books.length ? posterGrid(books, { titles: true }) : '<div class="empty">No books on this shelf yet.</div>'}</div>
-    ${selection ? `<div class="bulk-bar" role="region" aria-label="Bulk actions">
-      <span id="bulk-count"></span>
-      <button type="button" class="btn small ghost" id="select-all">Select all ${books.length}</button>
-      <button type="button" class="btn small ghost" id="select-none">Clear</button>
-      <span class="spacer"></span>
-      <button type="button" class="btn small primary" id="bulk-edit">Edit selected…</button>
-    </div>` : ''}`;
+    ${bulkBar(books.length)}`;
   $('#sort').addEventListener('change', (e) => (location.hash = `#/library?shelf=${shelf}&sort=${e.target.value}`));
+  wireSelection({ container: $('#library-grid'), items: '.poster', allIds: books.map((b) => b.id), mode: 'books', rerender: () => library(_, params) });
+}
+
+// ---------- bulk edit (Library books, Diary entries) ----------
+
+let selection = null; // Set of selected ids while a page is in select mode
+let selectionPage = '';
+const bulkDialog = $('#bulk-dialog');
+const bulkForm = $('#bulk-form');
+let bulkContext = null; // { mode: 'books' | 'entries', rerender }
+
+const BULK_TEXT = {
+  books: {
+    noun: ['book', 'books'],
+    shelf: 'Moves every selected book to this shelf.',
+    date: "Changes the date of each book's most recent read. Books that haven't been logged yet get a new diary entry on this date and move to Read.",
+    formats: "Replaces the formats on each book's most recent read.",
+  },
+  entries: {
+    noun: ['entry', 'entries'],
+    shelf: 'Moves the books these entries belong to onto this shelf.',
+    date: 'Sets this date on every selected entry.',
+    formats: 'Replaces the formats on every selected entry.',
+  },
+};
+const plural = (n, [one, many]) => `${n} ${n === 1 ? one : many}`;
+
+const selectToggle = () =>
+  `<button type="button" class="btn small" id="select-toggle" aria-pressed="${!!selection}">${selection ? 'Done selecting' : '☑ Select'}</button>`;
+
+const bulkBar = (total) =>
+  selection
+    ? `<div class="bulk-bar" role="region" aria-label="Bulk actions">
+        <span id="bulk-count"></span>
+        <button type="button" class="btn small ghost" id="select-all">Select all ${total}</button>
+        <button type="button" class="btn small ghost" id="select-none">Clear</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn small primary" id="bulk-edit">Edit selected…</button>
+      </div>`
+    : '';
+
+// In select mode, clicking an item toggles it instead of following its link.
+function wireSelection({ container, items, allIds, mode, rerender }) {
   $('#select-toggle').addEventListener('click', () => {
     selection = selection ? null : new Set();
-    library(_, params);
+    rerender();
   });
-  if (!selection) return;
-
-  const paintSelection = () => {
-    app.querySelectorAll('.poster').forEach((p) => {
-      const on = selection.has(p.dataset.id);
-      p.classList.toggle('selected', on);
-      p.setAttribute('aria-pressed', on);
+  if (!selection || !container) return;
+  const paint = () => {
+    container.querySelectorAll(items).forEach((el) => {
+      const on = selection.has(el.dataset.id);
+      el.classList.toggle('selected', on);
+      el.setAttribute('aria-pressed', on);
     });
     $('#bulk-count').textContent = `${selection.size} selected`;
     $('#bulk-edit').disabled = !selection.size;
   };
-  app.querySelectorAll('.poster').forEach((p) => p.setAttribute('role', 'button'));
-  $('#library-grid').addEventListener('click', (e) => {
-    const poster = e.target.closest('.poster');
-    if (!poster) return;
-    e.preventDefault(); // in select mode a click selects instead of opening the book
-    const id = poster.dataset.id;
-    selection.has(id) ? selection.delete(id) : selection.add(id);
-    paintSelection();
+  container.querySelectorAll(items).forEach((el) => el.setAttribute('role', 'button'));
+  container.addEventListener('click', (e) => {
+    const el = e.target.closest(items);
+    if (!el) return;
+    e.preventDefault();
+    selection.has(el.dataset.id) ? selection.delete(el.dataset.id) : selection.add(el.dataset.id);
+    paint();
   });
   $('#select-all').addEventListener('click', () => {
-    books.forEach((b) => selection.add(b.id));
-    paintSelection();
+    allIds.forEach((id) => selection.add(id));
+    paint();
   });
   $('#select-none').addEventListener('click', () => {
     selection.clear();
-    paintSelection();
+    paint();
   });
-  $('#bulk-edit').addEventListener('click', () => openBulkDialog(() => library(_, params)));
-  paintSelection();
+  $('#bulk-edit').addEventListener('click', () => openBulkDialog(mode, rerender));
+  paint();
 }
-
-// ---------- library bulk edit ----------
-
-let selection = null; // Set of selected book ids while the Library is in select mode
-const bulkDialog = $('#bulk-dialog');
-const bulkForm = $('#bulk-form');
-let afterBulk = null;
 
 bulkForm.shelf.innerHTML = Object.entries(store.SHELVES).map(([k, l]) => `<option value="${k}">${l}</option>`).join('');
 // Touching a section's controls ticks that section.
@@ -710,13 +743,17 @@ for (const [box, controls] of [['doShelf', '[name=shelf]'], ['doDate', '[name=da
 
 bulkForm.addEventListener('input', () => ($('#bulk-error').hidden = true));
 
-function openBulkDialog(onDone) {
-  afterBulk = onDone;
+function openBulkDialog(mode, rerender) {
+  bulkContext = { mode, rerender };
+  const text = BULK_TEXT[mode];
+  $('#bulk-hint-shelf').textContent = text.shelf;
+  $('#bulk-hint-date').textContent = text.date;
+  $('#bulk-hint-formats').textContent = text.formats;
   bulkForm.reset();
   bulkForm.date.value = today();
   $('#bulk-error').hidden = true;
   $('#bulk-error').textContent = 'Tick at least one thing to change.';
-  $('#bulk-title').textContent = `Edit ${selection.size} ${selection.size === 1 ? 'book' : 'books'}`;
+  $('#bulk-title').textContent = `Edit ${plural(selection.size, text.noun)}`;
   bulkDialog.showModal();
 }
 
@@ -739,14 +776,21 @@ $('#bulk-apply').addEventListener('click', (e) => {
     return;
   }
   const before = store.snapshot();
-  const r = store.bulkUpdate([...selection], changes);
-  const notes = [
-    r.created && `${r.created} new diary ${r.created === 1 ? 'entry' : 'entries'}`,
-    r.noRead && `${r.noRead} not logged yet, so no format set`,
-  ].filter(Boolean);
+  let message;
+  if (bulkContext.mode === 'entries') {
+    const r = store.bulkUpdateLogs([...selection], changes);
+    message = `Updated ${plural(r.entries, BULK_TEXT.entries.noun)}`;
+  } else {
+    const r = store.bulkUpdate([...selection], changes);
+    const notes = [
+      r.created && `${plural(r.created, ['new diary entry', 'new diary entries'])}`,
+      r.noRead && `${r.noRead} not logged yet, so no format set`,
+    ].filter(Boolean);
+    message = `Updated ${plural(r.books, BULK_TEXT.books.noun)}${notes.length ? ` (${notes.join('; ')})` : ''}`;
+  }
   selection = new Set();
-  afterBulk?.();
-  toast(`Updated ${r.books} ${r.books === 1 ? 'book' : 'books'}${notes.length ? ` (${notes.join('; ')})` : ''}`, {
+  bulkContext.rerender();
+  toast(message, {
     label: 'Undo',
     run: () => {
       store.restore(before);
