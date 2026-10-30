@@ -24,6 +24,9 @@ function formatIcons(formats) {
   return `<span class="format-icons" title="${esc(label)}" aria-label="${esc(label)}">${formats.map((f) => FORMAT_ICONS[f]).join(' ')}</span>`;
 }
 
+// "📱 Ebook · 🎧 Audiobook", shown in the Diary so the format is clear at a glance.
+const formatLabel = (formats) =>
+  formats?.length ? `<div class="format-label">${formats.map((f) => `${FORMAT_ICONS[f]} ${store.FORMATS[f]}`).join(' · ')}</div>` : '';
 const knitIcon = (l) => (l.knitted ? '<span title="Knitted while reading" aria-label="Knitted while reading">🧶</span>' : '');
 const tagList = (tags) => (tags?.length ? `<span class="tag-list">${tags.map((t) => `<span class="tag">${esc(t)}</span>`).join('')}</span>` : '');
 
@@ -67,7 +70,7 @@ function parseHash() {
 
 // ---------- router ----------
 
-const routes = { '': home, search, preview, add: addManually, import: importPage, book: bookPage, diary, library, stats };
+const routes = { '': diary, search, preview, add: addManually, import: importPage, book: bookPage, diary, library, stats };
 let currentAbort = null;
 
 function render({ keepScroll = false } = {}) {
@@ -75,12 +78,12 @@ function render({ keepScroll = false } = {}) {
   currentAbort?.abort();
   currentAbort = new AbortController();
   const { parts, params } = parseHash();
-  const view = routes[parts[0] || ''] || home;
+  const view = routes[parts[0] || ''] || diary;
   // Leaving a page (link, back button or swipe) closes any dialog left open on it.
   document.querySelectorAll('dialog[open]').forEach((d) => d.close('cancel'));
   if (parts[0] !== selectionPage) selection = null; // selections belong to one page
   selectionPage = parts[0];
-  const section = { preview: 'search', add: 'search', book: '', import: 'library' }[parts[0]] ?? (parts[0] || 'home');
+  const section = { preview: 'search', add: 'search', book: '', import: 'library' }[parts[0]] ?? (parts[0] || 'diary');
   document.querySelectorAll('[data-nav]').forEach((a) => {
     a.classList.toggle('active', a.dataset.nav === section);
     a.toggleAttribute('aria-current', a.dataset.nav === section);
@@ -91,41 +94,14 @@ function render({ keepScroll = false } = {}) {
 
 // ---------- home ----------
 
-function home() {
-  const { books } = store.getState();
-  const recent = store.allLogs().slice(0, 12);
-  const year = String(new Date().getFullYear());
-  const thisYear = store.allLogs().filter((l) => l.date.startsWith(year));
-
-  app.innerHTML = `
-    <h1>Welcome back.</h1>
-    <p class="muted">Here's what you've been reading.</p>
-    <form class="search-big" id="home-search">
-      <input name="q" type="search" placeholder="What did you read? Search by title, author or ISBN" autofocus>
-      <button class="btn primary">Search</button>
-    </form>
-    <div class="tile-row">
-      <div class="tile"><b>${thisYear.length}</b><span class="muted">books read in ${year}</span></div>
-      <div class="tile"><b>${Object.values(books).filter((b) => b.shelf === 'want').length}</b><span class="muted">want to read</span></div>
-    </div>
-    <h2 class="section-title"><span>Recently logged</span><a href="#/diary">Diary</a></h2>
-    ${recent.length ? posterGrid(recent.map((l) => ({ ...books[l.bookId], log: l })).filter((b) => b.id)) : `<div class="empty">Nothing logged yet. Search for a book you've read to start your diary.</div>`}
-  `;
-  $('#home-search').addEventListener('submit', (e) => {
-    e.preventDefault();
-    location.hash = `#/search?q=${encodeURIComponent(e.target.q.value)}`;
-  });
-}
-
-function posterGrid(books, { titles = false } = {}) {
+function posterGrid(books) {
   return `<div class="poster-row">${books
     .map((b) => {
-      const rating = b.log ? b.log.rating : store.latestRating(b.id);
-      const liked = b.log ? b.log.liked : false;
+      const rating = store.latestRating(b.id);
       return `<a class="poster" data-id="${esc(b.id)}" href="#/book/${encodeURIComponent(b.id)}" title="${esc(b.title)} — ${esc(authorsText(b.authors))}">
         ${cover(b)}
-        ${titles ? `<span class="poster-title">${esc(b.title)}</span><span class="poster-author">${esc(authorsText(b.authors))}</span>` : ''}
-        <span class="under"><span class="stars">${starsText(rating)}</span>${liked ? '<span class="heart">♥</span>' : ''}</span>
+        <span class="poster-title">${esc(b.title)}</span><span class="poster-author">${esc(authorsText(b.authors))}</span>
+        <span class="under"><span class="stars">${starsText(rating)}</span></span>
       </a>`;
     })
     .join('')}</div>`;
@@ -198,7 +174,7 @@ function resultRow(r) {
 
 async function preview([id], _, signal) {
   const result = resultCache.get(id) || resultFromId(id);
-  if (!result) return home();
+  if (!result) return diary([], new URLSearchParams());
   app.innerHTML = '<div class="spinner"></div>';
   try {
     const { book, editions } = await loadBookDetails(result, { signal });
@@ -642,9 +618,9 @@ function diary(_, params) {
           return `<a class="diary-row" data-id="${esc(l.id)}" href="#/book/${encodeURIComponent(b.id)}">
             <span class="diary-day">${Number(l.date.slice(8, 10))}</span>
             ${cover(b, 'sm')}
-            <div><h3>${esc(b.title)}</h3><span class="muted">${esc(authorsText(b.authors))}${b.pages ? ` · ${b.pages} pp` : ''}</span>${l.tags?.length ? `<div class="log-tags">${tagList(l.tags)}</div>` : ''}</div>
+            <div><h3>${esc(b.title)}</h3><span class="muted">${esc(authorsText(b.authors))}${b.pages ? ` · ${b.pages} pp` : ''}</span>${formatLabel(l.formats)}${l.tags?.length ? `<div class="log-tags">${tagList(l.tags)}</div>` : ''}</div>
             <span class="stars">${starsText(l.rating)}</span>
-            <span class="icons">${formatIcons(l.formats)}${knitIcon(l)}${l.liked ? '<span class="heart">♥</span>' : ''}${l.reread ? '<span title="Reread">↻</span>' : ''}${l.review ? '<span title="Has review">≡</span>' : ''}</span>
+            <span class="icons">${knitIcon(l)}${l.liked ? '<span class="heart">♥</span>' : ''}${l.reread ? '<span title="Reread">↻</span>' : ''}${l.review ? '<span title="Has review">≡</span>' : ''}</span>
           </a>`;
         }).join('')}
       </section>`)
@@ -677,12 +653,12 @@ function library(_, params) {
       <div class="head-actions">
         ${selectToggle()}
         <select id="sort" aria-label="Sort" class="sort-select">${Object.keys(sorters).map((k) => `<option value="${k}" ${k === sort ? 'selected' : ''}>Sort: ${k}</option>`).join('')}</select>
-        <a class="btn small" href="#/import">⇪ Import<span class="hide-sm">from StoryGraph</span></a>
+        <a class="btn small" href="#/import"><span>⇪ Import<span class="hide-sm"> from StoryGraph</span></span></a>
       </div>
     </div>
     <div class="tabs shelf-tabs">${tab('all', 'All')}${Object.entries(store.SHELVES).map(([k, l]) => tab(k, l)).join('')}</div>
     ${selection ? `<p class="muted select-hint">Click books to select them, then choose <b>Edit selected</b>.</p>` : ''}
-    <div class="${selection ? 'selecting' : ''}" id="library-grid">${books.length ? posterGrid(books, { titles: true }) : '<div class="empty">No books on this shelf yet.</div>'}</div>
+    <div class="${selection ? 'selecting' : ''}" id="library-grid">${books.length ? posterGrid(books) : '<div class="empty">No books on this shelf yet.</div>'}</div>
     ${bulkBar(books.length)}`;
   $('#sort').addEventListener('change', (e) => (location.hash = `#/library?shelf=${shelf}&sort=${e.target.value}`));
   wireSelection({ container: $('#library-grid'), items: '.poster', allIds: books.map((b) => b.id), mode: 'books', rerender: () => library(_, params) });

@@ -240,6 +240,7 @@ progress { width: 100%; height: 10px; accent-color: var(--green); }
 .tag-stat { border: 1px solid transparent; font: inherit; font-size: .9rem; font-weight: 600; padding: .3rem .75rem; cursor: pointer; }
 .tag-stat:hover, .tag-stat:focus-visible { border-color: var(--green); outline: none; }
 .tag-count { margin-left: .45rem; padding: 0 .4rem; border-radius: 999px; background: rgba(0,0,0,.3); color: var(--text); font-size: .8rem; }
+.format-label { color: var(--muted); font-size: .8rem; margin-top: .15rem; }
 .log-tags { margin-top: .3rem; }
 .check-row { display: flex; gap: .5rem 1.5rem; flex-wrap: wrap; }
 .tag-box { position: relative; }
@@ -279,7 +280,7 @@ progress { width: 100%; height: 10px; accent-color: var(--green); }
   #settings-btn { margin-left: auto; width: 44px; height: 44px; font-size: 1.35rem; }
 
   /* Bottom tab bar, above the home indicator */
-  .topbar nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(5, 1fr); gap: 0;
+  .topbar nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
     background: rgba(14,17,20,.94); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-top: 1px solid var(--line);
     padding: .35rem env(safe-area-inset-right) calc(.35rem + env(safe-area-inset-bottom)) env(safe-area-inset-left); text-transform: none; letter-spacing: 0; }
   .topbar nav a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .15rem; min-height: 48px; font-size: .68rem; font-weight: 600; color: var(--muted); }
