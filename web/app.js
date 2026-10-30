@@ -87,11 +87,9 @@ function render({ keepScroll = false } = {}) {
 
 function home() {
   const { books } = store.getState();
-  const reading = Object.values(books).filter((b) => b.shelf === 'reading');
   const recent = store.allLogs().slice(0, 12);
   const year = String(new Date().getFullYear());
   const thisYear = store.allLogs().filter((l) => l.date.startsWith(year));
-  const pages = thisYear.reduce((n, l) => n + (Number(books[l.bookId]?.pages) || 0), 0);
 
   app.innerHTML = `
     <h1>Welcome back.</h1>
@@ -102,11 +100,8 @@ function home() {
     </form>
     <div class="tile-row">
       <div class="tile"><b>${thisYear.length}</b><span class="muted">books read in ${year}</span></div>
-      <div class="tile"><b>${pages.toLocaleString()}</b><span class="muted">pages in ${year}</span></div>
-      <div class="tile"><b>${reading.length}</b><span class="muted">currently reading</span></div>
       <div class="tile"><b>${Object.values(books).filter((b) => b.shelf === 'want').length}</b><span class="muted">want to read</span></div>
     </div>
-    ${reading.length ? `<h2 class="section-title">Currently reading</h2>${posterGrid(reading)}` : ''}
     <h2 class="section-title"><span>Recently logged</span><a href="#/diary">Diary</a></h2>
     ${recent.length ? posterGrid(recent.map((l) => ({ ...books[l.bookId], log: l })).filter((b) => b.id)) : `<div class="empty">Nothing logged yet. Search for a book you've read to start your diary.</div>`}
   `;
@@ -821,10 +816,8 @@ function stats(_, params) {
     return drills.length - 1;
   };
   const groupBy = (fn) => Object.entries(picked.reduce((m, l) => (fn(l).forEach((k) => k && (m[k] ||= []).push(l)), m), {})).sort((a, b) => b[1].length - a[1].length);
-  const pagesOf = (l) => Number(books[l.bookId].pages) || 0;
 
   const rated = picked.filter((l) => l.rating);
-  const pages = picked.reduce((n, l) => n + pagesOf(l), 0);
   const liked = picked.filter((l) => l.liked);
   const knitted = picked.filter((l) => l.knitted);
   // Tags group case-insensitively under their most-used spelling.
@@ -897,7 +890,6 @@ function stats(_, params) {
     ${picked.length ? '' : '<div class="empty">No books logged in this period.</div>'}
     <div class="tile-row">
       ${tile(picked.length, 'books', drill('Books', picked))}
-      ${tile(pages.toLocaleString(), 'pages', drill('Pages', [...picked].sort((a, b) => pagesOf(b) - pagesOf(a)), { showPages: true }))}
       ${tile(rated.length ? (rated.reduce((n, l) => n + l.rating, 0) / rated.length).toFixed(1) : '—', 'average rating', drill('Rated books', [...rated].sort((a, b) => b.rating - a.rating)))}
       ${tile(liked.length, 'liked', drill('Liked', liked))}
       ${tile(`🧶 ${knitted.length}`, 'knitted', drill('Knitted while reading', knitted),
@@ -928,13 +920,13 @@ function stats(_, params) {
 }
 
 const drillDialog = $('#drill-dialog');
-function openDrill({ title, entries, showPages, ownPeriod }, period) {
+function openDrill({ title, entries, ownPeriod }, period) {
   const { books } = store.getState();
   $('#drill-title').textContent = title;
   $('#drill-sub').textContent = `${ownPeriod ? '' : `${period} · `}${entries.length} ${entries.length === 1 ? 'book' : 'books'}`;
   $('#drill-list').innerHTML = entries.map((l) => {
     const b = books[l.bookId];
-    const meta = [new Date(l.date + 'T00:00').toLocaleDateString(undefined, { dateStyle: 'medium' }), showPages ? (b.pages ? `${Number(b.pages).toLocaleString()} pp` : 'pages unknown') : ''].filter(Boolean).join(' · ');
+    const meta = new Date(l.date + 'T00:00').toLocaleDateString(undefined, { dateStyle: 'medium' });
     return `<li><a class="drill-row" href="#/book/${encodeURIComponent(b.id)}">
       ${cover(b, 'sm')}
       <div><h3>${esc(b.title)}</h3><span class="muted">${esc(authorsText(b.authors))}</span><br>
