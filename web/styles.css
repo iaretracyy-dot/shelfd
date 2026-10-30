@@ -99,7 +99,8 @@ main { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; outline:
 .about-col .description { margin: 0 0 .4rem; max-width: none; }
 .actions-panel { background: var(--surface-2); border-radius: var(--radius); padding: .75rem; display: grid; gap: .5rem; margin-top: 1rem; }
 .actions-panel .btn:not(.primary):not(.ghost):not([aria-pressed="true"]) { background: var(--surface); }
-.shelf-buttons { display: grid; grid-template-columns: repeat(2, 1fr); gap: .4rem; }
+.shelf-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; }
+.shelf-buttons .btn { padding-left: .4rem; padding-right: .4rem; }
 .edition-picker { margin: 0 0 1rem; display: grid; gap: .3rem; font-size: .85rem; color: var(--muted); }
 
 /* stars */
@@ -266,7 +267,14 @@ progress { width: 100%; height: 10px; accent-color: var(--green); }
 .nav-ico { display: none; }
 .nav-search { display: none; }
 .sort-select { width: auto; padding: .3rem .6rem; font-size: .85rem; }
-.shelf-tabs { margin-top: .25rem; }
+.library-count { margin: -.25rem 0 .75rem; }
+.small-print a, .library-results-head a:not(.btn) { color: var(--blue); }
+.library-search { margin-bottom: .75rem; }
+.library-results { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: .75rem 1rem; margin-bottom: 1.5rem; }
+.library-results-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+.result-row { display: flex; align-items: center; gap: .75rem; border-bottom: 1px solid var(--line); }
+.result-row .result { flex: 1; min-width: 0; border-bottom: 0; }
+.result-row .btn, .add-state { flex: none; white-space: nowrap; }
 
 /* ---------- Phones (designed at iPhone 14: 390 x 844) ---------- */
 @media (max-width: 720px) {
@@ -302,6 +310,7 @@ progress { width: 100%; height: 10px; accent-color: var(--green); }
   /* Page headers: title, then a row of actions */
   .page-head { gap: .5rem; }
   .head-actions { width: 100%; }
+  .library-count { margin-top: .6rem; }
   .head-actions .sort-select { flex: 1; min-width: 0; padding: .4rem .6rem; }
   .shelf-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -1rem 1rem; padding: 0 1rem; scroll-padding: 1rem; }
   .shelf-tabs::-webkit-scrollbar { display: none; }

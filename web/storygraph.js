@@ -68,9 +68,9 @@ const COLUMNS = {
 
 const STATUS = {
   read: 'read',
-  'currently-reading': 'reading',
-  'currently reading': 'reading',
-  paused: 'reading',
+  'currently-reading': 'want', // Shelfd has no "Reading" status
+  'currently reading': 'want',
+  paused: 'want',
   'to-read': 'want',
   'to read': 'want',
   'did-not-finish': 'dnf',

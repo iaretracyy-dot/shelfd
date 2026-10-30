@@ -1,7 +1,7 @@
 // Local persistence in the browser. Export / import uses this same JSON shape.
 
 const KEY = 'shelfd.v1';
-export const SHELVES = { want: 'Want to read', reading: 'Reading', read: 'Read', dnf: 'Did not finish' };
+export const SHELVES = { want: 'Want to read', read: 'Read', dnf: 'Did not finish' };
 export const FORMATS = { physical: 'Physical', ebook: 'Ebook', audio: 'Audiobook' };
 
 let state = load();
@@ -10,9 +10,15 @@ const listeners = new Set();
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
-    if (s && s.books && Array.isArray(s.logs)) return s;
+    if (s && s.books && Array.isArray(s.logs)) return normalizeShelves(s);
   } catch {}
   return { version: 1, books: {}, logs: [], settings: {} };
+}
+
+// The old "Reading" status (or anything unknown) becomes Want to read.
+function normalizeShelves(s) {
+  for (const b of Object.values(s.books)) if (!SHELVES[b.shelf]) b.shelf = 'want';
+  return s;
 }
 
 // Several tabs can have Shelfd open at once. Every change first re-reads the
@@ -55,8 +61,14 @@ export function bookId(book) {
 export function findInLibrary(book) {
   const id = bookId(book);
   if (state.books[id]) return state.books[id];
-  // Same work already shelved under a different edition counts as "in library".
-  return Object.values(state.books).find((b) => book.workKey && b.workKey === book.workKey) || null;
+  const all = Object.values(state.books);
+  // Same work under a different edition counts as "in library"; so does the same
+  // title + first author (imported or hand-added books have no catalog keys).
+  return all.find((b) => book.workKey && b.workKey === book.workKey) || all.find((b) => titleAuthorKey(b) === titleAuthorKey(book)) || null;
+}
+
+function titleAuthorKey(b) {
+  return `${String(b.title || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')}|${String(b.authors?.[0] || '').toLowerCase().replace(/[^\p{L}]/gu, '')}`;
 }
 
 const BOOK_FIELDS = ['source', 'workKey', 'editionKey', 'googleId', 'title', 'subtitle', 'authors', 'publisher', 'imprint', 'pages', 'isbn13', 'isbn10', 'publishedDate', 'firstPublished', 'language', 'format', 'description', 'subjects', 'coverUrl'];
@@ -137,7 +149,7 @@ export function allTags() {
 // the same file twice changes nothing.
 export function importLibrary(incoming) {
   sync();
-  const key = (b) => `${String(b.title).toLowerCase().replace(/[^\p{L}\p{N}]/gu, '')}|${String(b.authors?.[0] || '').toLowerCase().replace(/[^\p{L}]/gu, '')}`;
+  const key = titleAuthorKey;
   const existing = Object.values(state.books);
   const result = { added: 0, matched: 0, entries: 0, ids: [] };
   for (const { logs = [], shelf, addedAt, ...book } of incoming) {
@@ -176,14 +188,14 @@ export function importLibrary(incoming) {
   return result;
 }
 
-// Library bulk edit. Each change is optional:
+// Library (Want to read) bulk edit. Each change is optional:
 //   shelf   - new status for every book
-//   date    - moves each book's most recent read to this date; books with no
-//             reads get a new diary entry on it
-//   formats - replaces the formats on each book's most recent read
+//   date    - "finished on": logs a new read on this date (a reread if the book
+//             was read before) and moves the book to Read
+//   formats - set on that new read, or on each book's most recent read
 export function bulkUpdate(ids, { shelf, date, formats }) {
   sync();
-  const r = { books: 0, redated: 0, created: 0, formatted: 0, noRead: 0 };
+  const r = { books: 0, created: 0, formatted: 0, noRead: 0 };
   const cleanFormats = formats && Object.keys(FORMATS).filter((f) => formats.includes(f));
   for (const id of ids) {
     const book = state.books[id];
@@ -191,15 +203,10 @@ export function bulkUpdate(ids, { shelf, date, formats }) {
     r.books++;
     let latest = logsFor(id)[0];
     if (date) {
-      if (latest) {
-        latest.date = date;
-        r.redated++;
-      } else {
-        latest = { id: crypto.randomUUID(), bookId: id, date, rating: 0, liked: false, reread: false, formats: [], knitted: false, tags: [], review: '', createdAt: new Date().toISOString() };
-        state.logs.push(latest);
-        book.shelf = 'read';
-        r.created++;
-      }
+      latest = { id: crypto.randomUUID(), bookId: id, date, rating: 0, liked: false, reread: !!latest, formats: [], knitted: false, tags: [], review: '', createdAt: new Date().toISOString() };
+      state.logs.push(latest);
+      book.shelf = 'read';
+      r.created++;
     }
     if (cleanFormats) {
       if (latest) {
@@ -271,6 +278,7 @@ export function importJSON(text) {
   const ids = new Set(state.logs.map((l) => l.id));
   state.books = { ...state.books, ...data.books };
   state.logs = [...state.logs, ...data.logs.filter((l) => !ids.has(l.id))];
+  normalizeShelves(state);
   commit();
   return { books: Object.keys(data.books).length, logs: data.logs.length };
 }

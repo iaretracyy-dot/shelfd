@@ -11,8 +11,8 @@ The site lives in **`web/`**. It's plain HTML/CSS/JS with no build step.
 - **Edition picker:** a book can have many editions. Pick the copy you actually read to get the right publisher and page count.
 - **Correct details**, or **add a book manually** when it isn't in any catalog yet.
 - **Diary:** log every read with a date, ★ to ★★★★★ in half steps, a ♥ like, a reread flag, formats (physical / ebook / audiobook), 🧶 knitted while reading, tags and a review. The Diary is the start page: filter it by year and month, see each read's format at a glance, and **bulk edit** selected entries' read date, format and their books' status, with Undo.
-- **Shelves:** Want to read · Reading · Read · Did not finish.
-- **Library:** a cover grid with sorting, plus **bulk edit**: select books (or a whole shelf) and change status, read date and/or format in one go, with Undo.
+- **Statuses:** Want to read · Read · Did not finish.
+- **Library = your Want to read list:** search to add books with one tap, sort the list, and **bulk edit** (mark several as finished on a date, set their format, or change status), with Undo.
 - **Stats:** filter by year and month. See books, ratings, formats (with combinations counted separately), knitting, tags, books per period, rating spread, top authors and top publishers. Click any number or bar to see the books behind it.
 - **Import from StoryGraph:** load StoryGraph's CSV export, or the same file saved as `.xlsx`. Shelves, read dates (one diary entry per read), ratings, reviews, formats and tags come across. Covers, publishers and page counts are then looked up by ISBN. Re-importing the same file never creates duplicates.
 - **Export / import JSON** for backups, or to move a library to another browser.

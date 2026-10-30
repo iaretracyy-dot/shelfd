@@ -83,7 +83,7 @@ function render({ keepScroll = false } = {}) {
   document.querySelectorAll('dialog[open]').forEach((d) => d.close('cancel'));
   if (parts[0] !== selectionPage) selection = null; // selections belong to one page
   selectionPage = parts[0];
-  const section = { preview: 'search', add: 'search', book: '', import: 'library' }[parts[0]] ?? (parts[0] || 'diary');
+  const section = { preview: 'search', add: 'search', book: '', import: '' }[parts[0]] ?? (parts[0] || 'diary');
   document.querySelectorAll('[data-nav]').forEach((a) => {
     a.classList.toggle('active', a.dataset.nav === section);
     a.toggleAttribute('aria-current', a.dataset.nav === section);
@@ -272,10 +272,7 @@ function renderPreview(state, signal) {
       <div>${cover(book, 'lg')}
         <div class="actions-panel">
           <button type="button" class="btn primary" data-act="log">＋ Log this book</button>
-          <div class="shelf-buttons">
-            <button type="button" class="btn small" data-shelf="reading">Reading</button>
-            <button type="button" class="btn small" data-shelf="want">Want to read</button>
-          </div>
+          <button type="button" class="btn small" data-shelf="want">＋ Want to read</button>
           ${owned ? `<a class="btn small ghost" href="#/book/${encodeURIComponent(owned.id)}">In your library: ${esc(store.SHELVES[owned.shelf] || '')} →</a>` : ''}
         </div>
       </div>
@@ -339,8 +336,7 @@ function addManually() {
       <label class="field wide">Description <textarea name="description" rows="4"></textarea></label>
       <div class="wide manual-actions">
         <button type="button" class="btn primary" data-act="log">＋ Log this book</button>
-        <button type="button" class="btn" data-shelf="reading">Reading</button>
-        <button type="button" class="btn" data-shelf="want">Want to read</button>
+        <button type="button" class="btn" data-shelf="want">＋ Want to read</button>
       </div>
     </form>`;
 
@@ -635,33 +631,103 @@ function diary(_, params) {
 
 // ---------- library ----------
 
-function library(_, params) {
-  const shelf = params.get('shelf') || 'all';
+// The Library is the Want to read list, with a search bar for adding books.
+let librarySearch = null; // last search, so re-renders don't search again: { q, results, issues, relaxed }
+
+function library(_, params, signal) {
   const sort = params.get('sort') || 'added';
-  let books = Object.values(store.getState().books);
-  if (shelf !== 'all') books = books.filter((b) => b.shelf === shelf);
+  const q = (params.get('q') || '').trim();
   const sorters = {
     added: (a, b) => b.addedAt.localeCompare(a.addedAt),
     title: (a, b) => a.title.localeCompare(b.title),
     author: (a, b) => (a.authors[0] || '').localeCompare(b.authors[0] || ''),
-    rating: (a, b) => store.latestRating(b.id) - store.latestRating(a.id),
   };
+  const books = Object.values(store.getState().books).filter((b) => b.shelf === 'want');
   books.sort(sorters[sort] || sorters.added);
-  const tab = (k, label) => `<a class="btn small" aria-pressed="${shelf === k}" href="#/library?shelf=${k}&sort=${sort}">${label}</a>`;
+  const rerender = () => library(_, params, signal);
+
   app.innerHTML = `
     <div class="page-head"><h1>Library</h1>
       <div class="head-actions">
         ${selectToggle()}
         <select id="sort" aria-label="Sort" class="sort-select">${Object.keys(sorters).map((k) => `<option value="${k}" ${k === sort ? 'selected' : ''}>Sort: ${k}</option>`).join('')}</select>
-        <a class="btn small" href="#/import"><span>⇪ Import<span class="hide-sm"> from StoryGraph</span></span></a>
       </div>
     </div>
-    <div class="tabs shelf-tabs">${tab('all', 'All')}${Object.entries(store.SHELVES).map(([k, l]) => tab(k, l)).join('')}</div>
+    <p class="muted library-count">${books.length} ${books.length === 1 ? 'book' : 'books'} you want to read</p>
+    <form class="search-big library-search" id="library-search" role="search">
+      <input name="q" type="search" value="${esc(q)}" placeholder="Add a book: title, author or ISBN" aria-label="Search for a book to add" autocomplete="off">
+      <button class="btn primary">Search</button>
+    </form>
+    <div id="library-results"></div>
     ${selection ? `<p class="muted select-hint">Click books to select them, then choose <b>Edit selected</b>.</p>` : ''}
-    <div class="${selection ? 'selecting' : ''}" id="library-grid">${books.length ? posterGrid(books) : '<div class="empty">No books on this shelf yet.</div>'}</div>
+    <div class="${selection ? 'selecting' : ''}" id="library-grid">${books.length ? posterGrid(books) : '<div class="empty">Your Want to read list is empty. Search above to add a book.</div>'}</div>
     ${bulkBar(books.length)}`;
-  $('#sort').addEventListener('change', (e) => (location.hash = `#/library?shelf=${shelf}&sort=${e.target.value}`));
-  wireSelection({ container: $('#library-grid'), items: '.poster', allIds: books.map((b) => b.id), mode: 'books', rerender: () => library(_, params) });
+
+  const hashFor = (query) => `#/library?sort=${sort}${query ? `&q=${encodeURIComponent(query)}` : ''}`;
+  $('#sort').addEventListener('change', (e) => (location.hash = `#/library?sort=${e.target.value}${q ? `&q=${encodeURIComponent(q)}` : ''}`));
+  $('#library-search').addEventListener('submit', (e) => {
+    e.preventDefault();
+    location.hash = hashFor(e.target.q.value.trim());
+  });
+  wireSelection({ container: $('#library-grid'), items: '.poster', allIds: books.map((b) => b.id), mode: 'books', rerender });
+  if (q) showLibraryResults(q, signal, rerender, hashFor(''));
+}
+
+async function showLibraryResults(q, signal, rerender, clearHref) {
+  const out = $('#library-results');
+  if (librarySearch?.q !== q) {
+    out.innerHTML = '<div class="spinner"></div>';
+    try {
+      librarySearch = { q, ...(await searchCatalog(q, { signal })) };
+    } catch (err) {
+      if (err.name !== 'AbortError') out.innerHTML = `<div class="empty">${esc(err.message)}</div>`;
+      return;
+    }
+    if (signal?.aborted) return;
+  }
+  const { results, issues, relaxed } = librarySearch;
+  results.forEach((r) => resultCache.set(r.id, r));
+  out.innerHTML = `
+    <div class="library-results">
+      ${issues.map(issueNotice).join('')}
+      <div class="library-results-head">
+        <span class="muted">${results.length ? (relaxed ? `Showing results for <b>“${esc(relaxed)}”</b>` : `${results.length} results for “${esc(q)}”`) : `No books found for “${esc(q)}”.`}</span>
+        <a href="${clearHref}" class="btn small ghost">✕ Close results</a>
+      </div>
+      <ul class="results">${results.map(addableRow).join('')}</ul>
+      <p class="muted small-print">Not here? <a href="#/add">Add it manually</a>.</p>
+    </div>`;
+  out.querySelectorAll('[data-add]').forEach((btn) =>
+    btn.addEventListener('click', async () => {
+      const result = resultCache.get(btn.dataset.add);
+      btn.disabled = true;
+      btn.textContent = 'Adding…';
+      try {
+        const { book } = await loadBookDetails(result); // fills publisher, pages, cover…
+        const saved = store.saveBook(book, { shelf: 'want' });
+        toast(`Added “${saved.title}” to Want to read`);
+        rerender();
+      } catch {
+        btn.disabled = false;
+        btn.textContent = '＋ Add';
+        toast("Couldn't load that book. Try again.");
+      }
+    }),
+  );
+}
+
+// A search result with a one-tap "Add" (or its status if it's already in the library).
+function addableRow(r) {
+  const owned = store.findInLibrary(r);
+  const action = owned
+    ? `<span class="badge ${owned.shelf === 'want' ? 'green' : ''} add-state">${owned.shelf === 'want' ? '✓ On your list' : esc(store.SHELVES[owned.shelf])}</span>`
+    : `<button type="button" class="btn small primary" data-add="${esc(r.id)}" aria-label="Add ${esc(r.title)} to Want to read">＋ Add</button>`;
+  return `<li class="result-row"><a class="result" href="#/preview/${encodeURIComponent(r.id)}">
+    ${cover(r, 'sm')}
+    <div>
+      <h3>${esc(r.title)}${r.year ? ` <span class="muted">${esc(r.year)}</span>` : ''}</h3>
+      <div class="meta">${esc(authorsText(r.authors))}</div>
+    </div></a>${action}</li>`;
 }
 
 // ---------- bulk edit (Library books, Diary entries) ----------
@@ -676,8 +742,8 @@ const BULK_TEXT = {
   books: {
     noun: ['book', 'books'],
     shelf: 'Moves every selected book to this shelf.',
-    date: "Changes the date of each book's most recent read. Books that haven't been logged yet get a new diary entry on this date and move to Read.",
-    formats: "Replaces the formats on each book's most recent read.",
+    date: 'Marks each book as finished on this date: adds a diary entry and moves it to Read.',
+    formats: 'Sets the format on that diary entry (without a read date: on each book\'s most recent read).',
   },
   entries: {
     noun: ['entry', 'entries'],
@@ -787,7 +853,7 @@ $('#bulk-apply').addEventListener('click', (e) => {
   } else {
     const r = store.bulkUpdate([...selection], changes);
     const notes = [
-      r.created && `${plural(r.created, ['new diary entry', 'new diary entries'])}`,
+      r.created && `${plural(r.created, ['book', 'books'])} moved to Read`,
       r.noRead && `${r.noRead} not logged yet, so no format set`,
     ].filter(Boolean);
     message = `Updated ${plural(r.books, BULK_TEXT.books.noun)}${notes.length ? ` (${notes.join('; ')})` : ''}`;
