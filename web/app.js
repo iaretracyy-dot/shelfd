@@ -594,13 +594,35 @@ function logItem(l) {
 
 // ---------- diary ----------
 
-function diary() {
+function diary(_, params) {
   const { books } = store.getState();
-  const logs = store.allLogs().filter((l) => books[l.bookId]);
-  if (!logs.length) {
+  const everything = store.allLogs().filter((l) => books[l.bookId]);
+  if (!everything.length) {
     app.innerHTML = `<h1>Diary</h1><div class="empty">Your diary is empty. <a href="#/search">Log a book</a> to begin.</div>`;
     return;
   }
+  // Year / month filters (default: everything)
+  const years = [...new Set(everything.map((l) => l.date.slice(0, 4)))].sort().reverse();
+  const year = years.includes(params.get('year')) ? params.get('year') : 'all';
+  const month = /^(0[1-9]|1[0-2])$/.test(params.get('month')) ? params.get('month') : 'all';
+  const logs = everything.filter((l) => (year === 'all' || l.date.startsWith(year)) && (month === 'all' || l.date.slice(5, 7) === month));
+  const filtering = year !== 'all' || month !== 'all';
+  const filters = `
+    <form class="filters" id="diary-filters">
+      <label>Year
+        <select name="year">
+          <option value="all">All years</option>
+          ${years.map((y) => `<option ${y === year ? 'selected' : ''}>${y}</option>`).join('')}
+        </select>
+      </label>
+      <label>Month
+        <select name="month">
+          <option value="all">All months</option>
+          ${MONTHS.map((m, i) => { const v = String(i + 1).padStart(2, '0'); return `<option value="${v}" ${v === month ? 'selected' : ''}>${m}</option>`; }).join('')}
+        </select>
+      </label>
+    </form>
+    <p class="muted diary-count">${logs.length} ${logs.length === 1 ? 'entry' : 'entries'}${filtering ? ` · <a href="#/diary">Show all</a>` : ''}</p>`;
   const months = new Map();
   for (const l of logs) {
     const key = l.date.slice(0, 7);
@@ -608,7 +630,9 @@ function diary() {
     months.get(key).push(l);
   }
   app.innerHTML = `<div class="page-head"><h1>Diary</h1><div class="head-actions">${selectToggle()}</div></div>
+    ${filters}
     ${selection ? `<p class="muted select-hint">Click entries to select them, then choose <b>Edit selected</b>.</p>` : ''}
+    ${logs.length ? '' : '<div class="empty">No diary entries in this period.</div>'}
     <div class="${selection ? 'selecting' : ''}" id="diary-list">${[...months]
     .map(([month, entries]) => `
       <section class="diary-month">
@@ -626,7 +650,11 @@ function diary() {
       </section>`)
     .join('')}</div>
     ${bulkBar(logs.length)}`;
-  wireSelection({ container: $('#diary-list'), items: '.diary-row', allIds: logs.map((l) => l.id), mode: 'entries', rerender: diary });
+  $('#diary-filters').addEventListener('change', (e) => {
+    const f = e.currentTarget;
+    location.hash = `#/diary?year=${f.year.value}&month=${f.month.value}`;
+  });
+  wireSelection({ container: $('#diary-list'), items: '.diary-row', allIds: logs.map((l) => l.id), mode: 'entries', rerender: () => diary(_, params) });
 }
 
 // ---------- library ----------
