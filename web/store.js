@@ -15,6 +15,15 @@ function load() {
   return { version: 1, books: {}, logs: [], settings: {} };
 }
 
+const todayISO = () => new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD, local
+
+// Status changes go through here so we remember when a book was marked Did
+// not finish (Stats places DNF books in a year/month by that date).
+function setShelf(book, shelf) {
+  if (shelf === 'dnf' && book.shelf !== 'dnf') book.dnfAt = todayISO();
+  book.shelf = shelf;
+}
+
 // The old "Reading" status (or anything unknown) becomes Want to read.
 function normalizeShelves(s) {
   for (const b of Object.values(s.books)) if (!SHELVES[b.shelf]) b.shelf = 'want';
@@ -78,7 +87,9 @@ export function saveBook(book, patch = {}) {
   const id = book.id || bookId(book);
   const existing = state.books[id];
   const data = Object.fromEntries(BOOK_FIELDS.map((f) => [f, book[f] ?? existing?.[f] ?? '']));
-  state.books[id] = { ...existing, ...data, ...patch, id, addedAt: existing?.addedAt || new Date().toISOString() };
+  const { shelf, ...rest } = patch;
+  state.books[id] = { ...existing, ...data, ...rest, id, addedAt: existing?.addedAt || new Date().toISOString() };
+  if (shelf) setShelf(state.books[id], shelf);
   commit();
   return state.books[id];
 }
@@ -86,7 +97,9 @@ export function saveBook(book, patch = {}) {
 export function updateBook(id, patch) {
   sync();
   if (!state.books[id]) return;
-  state.books[id] = { ...state.books[id], ...patch };
+  const { shelf, ...rest } = patch;
+  state.books[id] = { ...state.books[id], ...rest };
+  if (shelf) setShelf(state.books[id], shelf);
   commit();
 }
 
@@ -161,6 +174,7 @@ export function importLibrary(incoming) {
     } else {
       const id = isbn ? `isbn:${isbn}` : `sg:${key(book)}`;
       target = { ...Object.fromEntries(BOOK_FIELDS.map((f) => [f, book[f] ?? ''])), id, shelf, addedAt: addedAt ? `${addedAt}T00:00:00.000Z` : new Date().toISOString() };
+      if (book.dnfAt) target.dnfAt = book.dnfAt;
       state.books[id] = target;
       existing.push(target);
       result.added++;
@@ -214,7 +228,7 @@ export function bulkUpdate(ids, { shelf, date, formats }) {
         r.formatted++;
       } else r.noRead++;
     }
-    if (shelf) book.shelf = shelf;
+    if (shelf) setShelf(book, shelf);
   }
   commit();
   return r;
@@ -236,7 +250,7 @@ export function bulkUpdateLogs(logIds, { shelf, date, formats }) {
     if (date) log.date = date;
     if (cleanFormats) log.formats = cleanFormats;
   }
-  if (shelf) for (const id of bookIds) if (state.books[id]) state.books[id].shelf = shelf;
+  if (shelf) for (const id of bookIds) if (state.books[id]) setShelf(state.books[id], shelf);
   commit();
   return { entries, books: bookIds.size };
 }

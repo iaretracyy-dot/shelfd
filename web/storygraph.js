@@ -106,6 +106,7 @@ export function parseStoryGraph(rows) {
       shelf: status,
       addedAt: toISODate(get(r, 'added')),
     };
+    if (status === 'dnf') book.dnfAt = toISODate(get(r, 'lastRead')) || book.addedAt;
     book.coverUrl = book.isbn13 || book.isbn10 ? `https://covers.openlibrary.org/b/isbn/${book.isbn13 || book.isbn10}-L.jpg?default=false` : '';
 
     const reads = status === 'read' ? readDates(get(r, 'datesRead'), get(r, 'lastRead'), get(r, 'added')) : [];

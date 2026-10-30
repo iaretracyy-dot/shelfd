@@ -45,7 +45,16 @@ function cover(book, size = '') {
   return `<div class="${cls}">${esc(book.title)}</div>`;
 }
 
+// Shorten book titles inside notifications so they stay on one line.
+function clip(text, max = 24) {
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max - 1);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > max / 2 ? cut.slice(0, space) : cut).replace(/[\s,:;–-]+$/, '')}…`; // end on a whole word
+}
+
 // toast('Saved') or toast('Updated', { label: 'Undo', run: fn }) for an action button.
+// Every notification stays 8 seconds, then fades out.
 function toast(msg, action) {
   const t = $('#toast');
   t.textContent = msg;
@@ -60,7 +69,7 @@ function toast(msg, action) {
   }
   t.classList.add('show');
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => t.classList.remove('show'), action ? 8000 : 2200);
+  toast.timer = setTimeout(() => t.classList.remove('show'), 8000);
 }
 
 function parseHash() {
@@ -136,7 +145,7 @@ async function search(_, params, signal) {
     $('#results').innerHTML = `
       ${issues.map(issueNotice).join('')}
       ${results.length
-        ? `<p class="muted">${relaxed ? `No exact matches for “${esc(q)}”. Showing results for <b>“${esc(relaxed)}”</b>.` : `${results.length} results for “${esc(q)}”.`} Select the book you read.</p>
+        ? `<p class="muted">${relaxed ? `No exact matches for “${esc(q)}”. Showing results for <b>“${esc(relaxed)}”</b>.` : `${results.length} ${results.length === 1 ? 'result' : 'results'} for “${esc(q)}”.`} Select the book you read.</p>
            <ul class="results">${results.map(resultRow).join('')}</ul>`
         : allFailed
           ? `<div class="empty">Couldn't reach the book catalogs, so this search didn't run. Check your connection and try again.</div>`
@@ -691,7 +700,7 @@ async function showLibraryResults(q, signal, rerender, clearHref) {
     <div class="library-results">
       ${issues.map(issueNotice).join('')}
       <div class="library-results-head">
-        <span class="muted">${results.length ? (relaxed ? `Showing results for <b>“${esc(relaxed)}”</b>` : `${results.length} results for “${esc(q)}”`) : `No books found for “${esc(q)}”.`}</span>
+        <span class="muted">${results.length ? (relaxed ? `Showing results for <b>“${esc(relaxed)}”</b>` : `${results.length} ${results.length === 1 ? 'result' : 'results'} for “${esc(q)}”`) : `No books found for “${esc(q)}”.`}</span>
         <a href="${clearHref}" class="btn small ghost">✕ Close results</a>
       </div>
       <ul class="results">${results.map(addableRow).join('')}</ul>
@@ -705,7 +714,7 @@ async function showLibraryResults(q, signal, rerender, clearHref) {
       try {
         const { book } = await loadBookDetails(result); // fills publisher, pages, cover…
         const saved = store.saveBook(book, { shelf: 'want' });
-        toast(`Added “${saved.title}” to Want to read`);
+        toast(`Added “${clip(saved.title)}” to Want to read`);
         rerender();
       } catch {
         btn.disabled = false;
@@ -877,11 +886,19 @@ const MONTHS = Array.from({ length: 12 }, (_, i) => new Date(2000, i, 1).toLocal
 function stats(_, params) {
   const { books } = store.getState();
   const logs = store.allLogs().filter((l) => books[l.bookId]);
-  const years = [...new Set(logs.map((l) => l.date.slice(0, 4)))].sort().reverse();
+  // Did-not-finish books have no diary entry; they're placed by the date they were marked DNF.
+  const dnfAll = Object.values(books)
+    .filter((b) => b.shelf === 'dnf')
+    .map((b) => ({ bookId: b.id, date: b.dnfAt || String(b.addedAt || '').slice(0, 10), rating: 0, formats: [], tags: [] }))
+    .filter((e) => e.date)
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const years = [...new Set([...logs, ...dnfAll].map((l) => l.date.slice(0, 4)))].sort().reverse();
   const thisYear = String(new Date().getFullYear());
   const year = params.get('year') || (years.includes(thisYear) ? thisYear : years[0]) || thisYear;
   const month = params.get('month') || 'all'; // '01'..'12' or 'all'
-  const picked = logs.filter((l) => (year === 'all' || l.date.startsWith(year)) && (month === 'all' || l.date.slice(5, 7) === month));
+  const inPeriod = (l) => (year === 'all' || l.date.startsWith(year)) && (month === 'all' || l.date.slice(5, 7) === month);
+  const picked = logs.filter(inPeriod);
+  const dnf = dnfAll.filter(inPeriod);
   const period = [month === 'all' ? '' : MONTHS[Number(month) - 1] + (year === 'all' ? ',' : ''), year === 'all' ? (month === 'all' ? 'All time' : 'all years') : year].filter(Boolean).join(' ');
 
   // Every number on the page is clickable: drill() remembers which diary entries make it up.
@@ -965,6 +982,7 @@ function stats(_, params) {
     ${picked.length ? '' : '<div class="empty">No books logged in this period.</div>'}
     <div class="tile-row">
       ${tile(picked.length, 'books', drill('Books', picked))}
+      ${tile(dnf.length, 'did not finish', drill('Did not finish', dnf))}
       ${tile(rated.length ? (rated.reduce((n, l) => n + l.rating, 0) / rated.length).toFixed(1) : '—', 'average rating', drill('Rated books', [...rated].sort((a, b) => b.rating - a.rating)))}
       ${tile(liked.length, 'liked', drill('Liked', liked))}
       ${tile(`🧶 ${knitted.length}`, 'knitted', drill('Knitted while reading', knitted),
