@@ -76,9 +76,15 @@ function render({ keepScroll = false } = {}) {
   currentAbort = new AbortController();
   const { parts, params } = parseHash();
   const view = routes[parts[0] || ''] || home;
+  // Leaving a page (link, back button or swipe) closes any dialog left open on it.
+  document.querySelectorAll('dialog[open]').forEach((d) => d.close('cancel'));
   if (parts[0] !== selectionPage) selection = null; // selections belong to one page
   selectionPage = parts[0];
-  document.querySelectorAll('[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === (parts[0] || 'home')));
+  const section = { preview: 'search', add: 'search', book: '', import: 'library' }[parts[0]] ?? (parts[0] || 'home');
+  document.querySelectorAll('[data-nav]').forEach((a) => {
+    a.classList.toggle('active', a.dataset.nav === section);
+    a.toggleAttribute('aria-current', a.dataset.nav === section);
+  });
   view(parts.slice(1), params, currentAbort.signal);
   window.scrollTo(0, keepScroll ? y : 0);
 }
@@ -642,13 +648,11 @@ function library(_, params) {
     <div class="page-head"><h1>Library</h1>
       <div class="head-actions">
         ${selectToggle()}
-        <a class="btn small" href="#/import">⇪ Import from StoryGraph</a>
+        <select id="sort" aria-label="Sort" class="sort-select">${Object.keys(sorters).map((k) => `<option value="${k}" ${k === sort ? 'selected' : ''}>Sort: ${k}</option>`).join('')}</select>
+        <a class="btn small" href="#/import">⇪ Import<span class="hide-sm">from StoryGraph</span></a>
       </div>
     </div>
-    <div class="tabs">${tab('all', 'All')}${Object.entries(store.SHELVES).map(([k, l]) => tab(k, l)).join('')}
-      <span class="spacer"></span>
-      <select id="sort" aria-label="Sort" style="width:auto">${Object.keys(sorters).map((k) => `<option value="${k}" ${k === sort ? 'selected' : ''}>Sort: ${k}</option>`).join('')}</select>
-    </div>
+    <div class="tabs shelf-tabs">${tab('all', 'All')}${Object.entries(store.SHELVES).map(([k, l]) => tab(k, l)).join('')}</div>
     ${selection ? `<p class="muted select-hint">Click books to select them, then choose <b>Edit selected</b>.</p>` : ''}
     <div class="${selection ? 'selecting' : ''}" id="library-grid">${books.length ? posterGrid(books, { titles: true }) : '<div class="empty">No books on this shelf yet.</div>'}</div>
     ${bulkBar(books.length)}`;
@@ -740,6 +744,7 @@ bulkForm.addEventListener('input', () => ($('#bulk-error').hidden = true));
 
 function openBulkDialog(mode, rerender) {
   bulkContext = { mode, rerender };
+  bulkDialog.returnValue = '';
   const text = BULK_TEXT[mode];
   $('#bulk-hint-shelf').textContent = text.shelf;
   $('#bulk-hint-date').textContent = text.date;
@@ -1105,6 +1110,7 @@ $('#tag-input').addEventListener('click', (e) => {
 // beforeSave lets the preview page add the book to the library only once the log is confirmed.
 function openLogDialog(book, log, beforeSave) {
   logContext = { book, log, beforeSave };
+  logDialog.returnValue = ''; // Safari can keep the last close value; never let it count as Save
   $('#log-title').textContent = book.title;
   $('#log-author').textContent = authorsText(book.authors);
   $('#log-cover').src = book.coverUrl || '';

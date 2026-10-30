@@ -2,19 +2,30 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Shelfd</title>
   <meta name="description" content="Log the books you read, rate them, and keep a reading diary." />
+  <meta name="theme-color" content="#0e1114" />
+  <!-- Add to Home Screen: opens full screen like an app -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Shelfd" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="topbar">
     <a href="#/" class="brand"><span class="dots"><i></i><i></i><i></i></span>Shelfd</a>
-    <nav>
-      <a href="#/" data-nav="home">Home</a>
-      <a href="#/diary" data-nav="diary">Diary</a>
-      <a href="#/library" data-nav="library">Library</a>
-      <a href="#/stats" data-nav="stats">Stats</a>
+    <!-- Top links on desktop; a bottom tab bar on phones -->
+    <nav aria-label="Main">
+      <a href="#/" data-nav="home"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
+      <a href="#/search" data-nav="search" class="nav-search"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span>Search</span></a>
+      <a href="#/diary" data-nav="diary"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11M9 8h6"/></svg><span>Diary</span></a>
+      <a href="#/library" data-nav="library"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h4v16H4zM10 4h4v16h-4zM15.5 5.4l3.8-1 3.2 15.2-3.8 1z"/></svg><span>Library</span></a>
+      <a href="#/stats" data-nav="stats"><svg class="nav-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Stats</span></a>
     </nav>
     <form class="quick-search" id="quick-search" role="search">
       <input type="search" name="q" placeholder="Search books, authors, ISBN" aria-label="Search the catalog" autocomplete="off" />
@@ -30,7 +41,7 @@
         <img id="log-cover" alt="" />
         <div>
           <p class="eyebrow">I read…</p>
-          <h2 id="log-title"></h2>
+          <h2 id="log-title" tabindex="-1" autofocus></h2>
           <p class="muted" id="log-author"></p>
         </div>
       </div>
@@ -80,7 +91,7 @@
 
   <dialog id="bulk-dialog" class="sheet">
     <form method="dialog" id="bulk-form">
-      <h2 id="bulk-title">Edit books</h2>
+      <h2 id="bulk-title" tabindex="-1" autofocus>Edit books</h2>
       <p class="muted">Tick what you want to change. Everything else stays as it is.</p>
       <fieldset class="bulk-section">
         <label class="check"><input type="checkbox" name="doShelf" /> <b>Status</b></label>
@@ -112,7 +123,7 @@
 
   <dialog id="settings-dialog" class="sheet">
     <form method="dialog">
-      <h2>Settings</h2>
+      <h2 tabindex="-1" autofocus>Settings</h2>
       <label class="field">Google Books API key <span class="muted">(optional — raises the search limit)</span>
         <input name="googleKey" autocomplete="off" spellcheck="false" />
       </label>
