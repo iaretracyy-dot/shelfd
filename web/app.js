@@ -54,7 +54,7 @@ function clip(text, max = 24) {
 }
 
 // toast('Saved') or toast('Updated', { label: 'Undo', run: fn }) for an action button.
-// Every notification stays 8 seconds, then fades out.
+// Every notification stays 3 seconds, then fades out.
 function toast(msg, action) {
   const t = $('#toast');
   t.textContent = msg;
@@ -69,7 +69,7 @@ function toast(msg, action) {
   }
   t.classList.add('show');
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => t.classList.remove('show'), 8000);
+  toast.timer = setTimeout(() => t.classList.remove('show'), 3000);
 }
 
 function parseHash() {
