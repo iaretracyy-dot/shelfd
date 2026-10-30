@@ -1282,6 +1282,42 @@ $('#import-file').addEventListener('change', async (e) => {
   e.target.value = '';
 });
 
+// ---------- search boxes: clear (×) button ----------
+// Every search box gets an × that appears once there's text and wipes it.
+// Pages re-render their HTML, so new boxes are picked up as they appear.
+
+function addClearButton(input) {
+  if (input.closest('.search-wrap')) return;
+  const hadFocus = document.activeElement === input; // moving an element drops focus
+  const wrap = document.createElement('span');
+  wrap.className = 'search-wrap';
+  input.replaceWith(wrap);
+  const btn = Object.assign(document.createElement('button'), { type: 'button', className: 'search-clear', textContent: '×', hidden: !input.value });
+  btn.setAttribute('aria-label', 'Clear search');
+  wrap.append(input, btn);
+  if (hadFocus) input.focus();
+}
+
+function addClearButtons(root = document) {
+  root.querySelectorAll('input[type=search]').forEach(addClearButton);
+}
+
+document.addEventListener('input', (e) => {
+  const btn = e.target.matches?.('.search-wrap input') && e.target.parentElement.querySelector('.search-clear');
+  if (btn) btn.hidden = !e.target.value;
+});
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.search-clear');
+  if (!btn) return;
+  const input = btn.parentElement.querySelector('input');
+  input.value = '';
+  btn.hidden = true;
+  input.focus();
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+});
+addClearButtons();
+new MutationObserver(() => addClearButtons(app)).observe(app, { childList: true, subtree: true });
+
 // ---------- boot ----------
 
 document.addEventListener('click', (e) => {

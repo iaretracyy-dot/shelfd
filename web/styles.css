@@ -67,6 +67,19 @@ main { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1.25rem 4rem; outline:
 /* search */
 .search-big { display: flex; gap: .5rem; margin-bottom: 1.25rem; }
 .search-big input { font-size: 1.1rem; padding: .75rem 1rem; }
+/* Search boxes: our own × to clear (the browser's built-in one is hidden so there's only one) */
+.search-wrap { position: relative; display: block; flex: 1; min-width: 0; }
+.search-wrap input { padding-right: 2.6rem !important; }
+.search-clear { position: absolute; right: .35rem; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border: 0; border-radius: 50%;
+  background: transparent; color: var(--muted); font-size: 1.35rem; line-height: 1; cursor: pointer; display: grid; place-items: center; }
+.search-clear::before { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: var(--line); z-index: -1; }
+.search-clear { isolation: isolate; }
+.search-clear:hover, .search-clear:focus-visible { color: var(--text); outline: none; }
+.search-clear:focus-visible::before { box-shadow: 0 0 0 2px var(--blue); }
+.search-clear[hidden] { display: none; }
+input[type=search]::-webkit-search-cancel-button, input[type=search]::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+.quick-search .search-wrap { width: 220px; }
+.quick-search input { width: 100%; }
 .results { list-style: none; padding: 0; margin: 0; }
 .result { display: flex; gap: 1rem; padding: .8rem 0; border-bottom: 1px solid var(--line); align-items: center; }
 .result:hover { background: rgba(255,255,255,.02); }
